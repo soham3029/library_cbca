@@ -1,69 +1,214 @@
-import tkinter as tk
-from tkinter import ttk, messagebox, Frame, filedialog
-from tkcalendar import DateEntry
-from PIL import ImageTk, Image
-import mysql.connector
-import pandas as pd
-from datetime import datetime
+import sys
 import uuid
 import os
+from datetime import datetime
+import numpy as np
+import pandas as pd
+import mysql.connector
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+                             QPushButton, QLabel, QLineEdit, QComboBox, QTableWidget,
+                             QTableWidgetItem, QHeaderView, QFrame, QTextEdit,
+                             QRadioButton, QFileDialog, QMessageBox, QDateEdit, QStackedWidget,
+                             QScrollArea, QCompleter)
+from PyQt5.QtGui import QPixmap, QFont, QImage, QIcon
+from PyQt5.QtCore import Qt, QDate, QSize, QStringListModel
 
-class LibraryManagementSystem:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("CBCA Library Management System")
-        self.root.geometry("1200x800")
-        self.root.configure(bg="#e6f3fa")  # Light teal background
+class LibraryManagementSystem(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("CBCA Library Management System")
+        self.setGeometry(100, 100, 1200, 800)
+
+        # Set global font with increased size
+        app = QApplication.instance()
+        app.setFont(QFont("Helvetica, Arial, sans-serif", 15))
+
+        # Updated stylesheet
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #f0f2f5;
+            }
+            QFrame {
+                background-color: white;
+                border: none;
+                border-radius: 10px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+            QFrame#loginFrame {
+                border: 3px solid #e5e7eb;
+            }
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #6366f1, stop:1 #4f46e5);
+                color: white;
+                border-radius: 5px;
+                padding: 12px;
+                font-size: 16pt;
+                border: none;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #818cf8, stop:1 #6366f1);
+            }
+            QLineEdit, QComboBox, QDateEdit {
+                border: 1px solid #d1d5db;
+                border-radius: 5px;
+                padding: 10px;
+                font-size: 15pt;
+                background-color: #ffffff;
+                min-height: 50px;
+            }
+            QLineEdit:focus, QComboBox:focus, QDateEdit:focus {
+                border: 1px solid #6366f1;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 30px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                width: 14px;
+                height: 14px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #ffffff;
+                color: #1f2937;
+                selection-background-color: #6366f1;
+                selection-color: white;
+                border: 1px solid #d1d5db;
+                padding: 5px;
+                font-size: 15pt;
+            }
+            QTableWidget {
+                border: none;
+                border-radius: 5px;
+                font-size: 15pt;
+                background-color: white;
+            }
+            QTableWidget::item {
+                padding: 12px;
+            }
+            QHeaderView::section {
+                background: #6366f1;
+                color: white;
+                padding: 12px;
+                font: bold 16pt;
+                border: none;
+            }
+            QLabel {
+                color: #1f2937;
+                font-size: 15pt;
+                border: none;
+                background: transparent;
+            }
+            QTextEdit {
+                border: 1px solid #d1d5db;
+                border-radius: 5px;
+                font-size: 14pt;
+                background-color: #f9fafb;
+            }
+        """)
 
         # Database connection
-        self.db = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="12345",
-            database="library_db"
-        )
-        self.create_tables()
+        try:
+            self.db = mysql.connector.connect(
+                host="localhost",
+                user="root",
+                password="12345",
+                database="library_db"
+            )
+            self.create_tables()
+        except mysql.connector.Error as err:
+            QMessageBox.critical(self, "Error", f"Failed to connect to database: {err}")
+            sys.exit(1)
 
-        # Styling
-        self.style = ttk.Style()
-        self.style.configure("TButton", padding=10, font=('Helvetica', 12), background="#f39c12")  # Orange buttons
-        self.style.configure("TLabel", font=('Helvetica', 12), background="#e6f3fa", foreground="#2c3e50")
-        self.style.configure("TEntry", padding=5)
-        self.style.configure("TCombobox", padding=5)
-        self.style.configure("Treeview.Heading", font=('Helvetica', 12, 'bold'), background="#3498db")  # Blue headers
-        self.style.configure("Treeview", font=('Helvetica', 11))
+        # Main layout
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        self.main_layout = QHBoxLayout(self.central_widget)
+        self.main_layout.setContentsMargins(20, 20, 20, 20)
 
-        # Logo
-        logo_path = "logo.png"
-        if os.path.exists(logo_path):
-            try:
-                img = Image.open(logo_path)
-                img = img.resize((200, 100), Image.LANCZOS)
-                self.logo = ImageTk.PhotoImage(img)
-                logo_label = tk.Label(root, image=self.logo, bg="#e6f3fa")
-                logo_label.pack(pady=20)
-            except Exception as e:
-                print(f"Error loading logo: {e}")
-                tk.Label(root, text="CBCA Library", font=('Helvetica', 24, 'bold'), bg="#e6f3fa", fg="#2c3e50").pack(pady=20)
-        else:
-            print(f"Logo file not found at: {os.path.abspath(logo_path)}")
-            tk.Label(root, text="CBCA Library", font=('Helvetica', 24, 'bold'), bg="#e6f3fa", fg="#2c3e50").pack(pady=20)
+        # Sidebar (initially hidden)
+        self.sidebar = QFrame()
+        self.sidebar.setFixedWidth(250)
+        self.sidebar.setVisible(False)
+        self.sidebar.setStyleSheet("""
+            QFrame {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #4f46e5, stop:1 #6366f1);
+                border-radius: 0;
+                border: none;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+            QPushButton {
+                background: transparent;
+                text-align: left;
+                padding: 16px;
+                font-size: 16pt;
+                border: none;
+                color: white;
+            }
+            QPushButton:hover {
+                background: rgba(255,255,255,0.1);
+            }
+        """)
+        sidebar_layout = QVBoxLayout(self.sidebar)
+        sidebar_layout.setContentsMargins(15, 30, 15, 30)
+        sidebar_layout.setSpacing(15)
 
-        # Frames
-        self.frames = {}
-        for F in (LoginPage, HomePage, CreateUserPage, BookAuthorPage, AssignReturnPage, AdminPanelPage, ReportPage):
-            page_name = F.__name__
-            frame = F(parent=root, controller=self)
-            self.frames[page_name] = frame
-            frame.place(x=0, y=0, width=1200, height=800)
+        # Sidebar buttons
+        sidebar_buttons = [
+            ("🏠 Home", lambda: self.show_page("HomePage")),
+            ("👤 Users", lambda: self.show_page("CreateUserPage")),
+            ("📚 Books", lambda: self.show_page("BookAuthorPage")),
+            ("🔄 Transactions", lambda: self.show_page("AssignReturnPage")),
+            ("🔧 Admin", lambda: self.show_page("AdminPanelPage")),
+            ("📊 Reports", lambda: self.show_page("ReportPage")),
+            ("🚪 Logout", lambda: self.logout())
+        ]
 
-        self.show_frame("LoginPage")
+        for text, command in sidebar_buttons:
+            btn = QPushButton(text)
+            btn.clicked.connect(command)
+            sidebar_layout.addWidget(btn)
+        sidebar_layout.addStretch()
 
-    def show_frame(self, page_name):
-        frame = self.frames[page_name]
-        frame.tkraise()
-        if hasattr(frame, 'refresh'):
-            frame.refresh()
+        self.main_layout.addWidget(self.sidebar)
+
+        # Content area
+        self.content_area = QStackedWidget()
+        self.main_layout.addWidget(self.content_area)
+
+        # Pages
+        self.pages = {
+            "LoginPage": LoginPage(self),
+            "HomePage": HomePage(self),
+            "CreateUserPage": CreateUserPage(self),
+            "BookAuthorPage": BookAuthorPage(self),
+            "AssignReturnPage": AssignReturnPage(self),
+            "AdminPanelPage": AdminPanelPage(self),
+            "ReportPage": ReportPage(self)
+        }
+
+        for page in self.pages.values():
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setWidget(page)
+            self.content_area.addWidget(scroll)
+
+        self.show_page("LoginPage")
+
+    def show_page(self, page_name):
+        try:
+            self.content_area.setCurrentWidget(self.content_area.widget(list(self.pages.keys()).index(page_name)))
+            if hasattr(self.pages[page_name], 'refresh'):
+                self.pages[page_name].refresh()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to show page: {e}")
+
+    def logout(self):
+        self.sidebar.setVisible(False)
+        self.show_page("LoginPage")
 
     def create_tables(self):
         cursor = self.db.cursor()
@@ -80,7 +225,8 @@ class LibraryManagementSystem:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS authors (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) UNIQUE NOT NULL
+                name VARCHAR(255) UNIQUE NOT NULL,
+                details TEXT
             )
         """)
         cursor.execute("""
@@ -110,94 +256,203 @@ class LibraryManagementSystem:
                 VALUES (%s, %s, %s, %s)
             """, ("admin", "0000", "admin", True))
         self.db.commit()
+        cursor.close()
 
-class LoginPage(Frame):
-    def __init__(self, parent, controller):
-        super().__init__(parent, bg="#e6f3fa")
+    def closeEvent(self, event):
+        if hasattr(self, 'db') and self.db.is_connected():
+            self.db.close()
+        event.accept()
+
+class LoginPage(QWidget):
+    def __init__(self, controller):
+        super().__init__()
         self.controller = controller
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(50, 50, 50, 50)
+        layout.setSpacing(30)
 
-        frame = tk.Frame(self, bg="#ffffff", padx=20, pady=20, relief="groove", bd=2)
-        frame.place(relx=0.5, rely=0.5, anchor="center")
+        # Logo
+        logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
+        if os.path.exists(logo_path):
+            pixmap = QPixmap(logo_path).scaled(300, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            logo_label = QLabel()
+            logo_label.setPixmap(pixmap)
+            logo_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(logo_label)
+        else:
+            logo_label = QLabel("CBCA Library")
+            logo_label.setFont(QFont("Helvetica, Arial, sans-serif", 40, QFont.Bold))
+            logo_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(logo_label)
 
-        tk.Label(frame, text="Login", font=('Helvetica', 18, 'bold'), bg="#ffffff", fg="#2c3e50").pack(pady=10)
-        tk.Label(frame, text="Username:", bg="#ffffff").pack()
-        self.username = ttk.Entry(frame, width=30)
-        self.username.pack(pady=5)
+        # Login card
+        frame = QFrame()
+        frame.setObjectName("loginFrame")
+        frame.setFixedSize(500, 450)
+        frame_layout = QVBoxLayout(frame)
+        frame_layout.setSpacing(20)
+        frame_layout.setContentsMargins(30, 30, 30, 30)
 
-        tk.Label(frame, text="Password:", bg="#ffffff").pack()
-        self.password = ttk.Entry(frame, show="*", width=30)
-        self.password.pack(pady=5)
+        title = QLabel("Sign In")
+        title.setStyleSheet("font-size: 32pt; font-weight: bold; color: #1f2937; border: none;")
+        frame_layout.addWidget(title)
 
-        ttk.Button(frame, text="Login", command=self.login).pack(pady=20)
+        self.username = QLineEdit()
+        self.username.setPlaceholderText("Username")
+        self.username.setMinimumHeight(50)
+        frame_layout.addWidget(self.username)
+
+        self.password = QLineEdit()
+        self.password.setEchoMode(QLineEdit.Password)
+        self.password.setPlaceholderText("Password")
+        self.password.setMinimumHeight(50)
+        frame_layout.addWidget(self.password)
+
+        login_btn = QPushButton("Login")
+        login_btn.setMinimumHeight(50)
+        login_btn.clicked.connect(self.login)
+        frame_layout.addWidget(login_btn)
+
+        layout.addStretch()
+        layout.addWidget(frame, alignment=Qt.AlignCenter)
+        layout.addStretch()
 
     def login(self):
-        username = self.username.get()
-        password = self.password.get()
+        try:
+            username = self.username.text().strip()
+            password = self.password.text().strip()
 
-        cursor = self.controller.db.cursor()
-        cursor.execute("SELECT * FROM users WHERE name=%s AND password=%s", (username, password))
-        user = cursor.fetchone()
+            if not username or not password:
+                QMessageBox.critical(self, "Error", "Please enter both username and password")
+                return
 
-        if user:
-            self.controller.show_frame("HomePage")
-            self.username.delete(0, tk.END)
-            self.password.delete(0, tk.END)
-        else:
-            messagebox.showerror("Error", "Invalid credentials")
+            cursor = self.controller.db.cursor()
+            cursor.execute("SELECT * FROM users WHERE name=%s AND password=%s", (username, password))
+            user = cursor.fetchone()
+            cursor.close()
 
-class HomePage(Frame):
-    def __init__(self, parent, controller):
-        super().__init__(parent, bg="#e6f3fa")
+            if user:
+                self.controller.sidebar.setVisible(True)
+                self.controller.show_page("HomePage")
+                self.username.clear()
+                self.password.clear()
+            else:
+                QMessageBox.critical(self, "Error", "Invalid credentials")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Login failed: {e}")
+
+class HomePage(QWidget):
+    def __init__(self, controller):
+        super().__init__()
         self.controller = controller
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(50, 50, 50, 50)
+        layout.setSpacing(30)
 
-        tk.Label(self, text="Welcome to CBCA Library", font=('Helvetica', 24, 'bold'), bg="#e6f3fa", fg="#2c3e50").pack(pady=20)
-        ttk.Button(self, text="Refresh", command=self.refresh).pack(pady=10)
-        ttk.Button(self, text="Create User", command=self.create_user).pack(pady=10)
-        ttk.Button(self, text="Book/Author Management", command=lambda: controller.show_frame("BookAuthorPage")).pack(pady=10)
-        ttk.Button(self, text="Assign/Return Books", command=lambda: controller.show_frame("AssignReturnPage")).pack(pady=10)
-        ttk.Button(self, text="Admin Panel", command=lambda: controller.show_frame("AdminPanelPage")).pack(pady=10)
-        ttk.Button(self, text="Reports", command=lambda: controller.show_frame("ReportPage")).pack(pady=10)
+        # Title
+        title = QLabel("Library Dashboard")
+        title.setFont(QFont("Helvetica, Arial, sans-serif", 32, QFont.Bold))
+        title.setStyleSheet("color: #1f2937; border: none;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
 
-    def create_user(self):
-        self.controller.show_frame("CreateUserPage")
+        # Cards
+        cards_layout = QHBoxLayout()
+        cards_layout.setSpacing(30)
+
+        buttons = [
+            ("👤 Manage Users", lambda: self.controller.show_page("CreateUserPage")),
+            ("📚 Manage Books", lambda: self.controller.show_page("BookAuthorPage")),
+            ("🔄 Transactions", lambda: self.controller.show_page("AssignReturnPage")),
+            ("📊 Reports", lambda: self.controller.show_page("ReportPage"))
+        ]
+
+        for text, command in buttons:
+            card = QFrame()
+            card_layout = QVBoxLayout(card)
+            card_layout.setAlignment(Qt.AlignCenter)
+            card_layout.setSpacing(15)
+
+            icon = QLabel(text.split()[0])
+            icon.setFont(QFont("Helvetica, Arial, sans-serif", 32))
+            card_layout.addWidget(icon)
+
+            label = QLabel(text.split()[1])
+            label.setFont(QFont("Helvetica, Arial, sans-serif", 18, QFont.Bold))
+            card_layout.addWidget(label)
+
+            btn = QPushButton("Go")
+            btn.setFixedWidth(150)
+            btn.setMinimumHeight(50)
+            btn.clicked.connect(command)
+            card_layout.addWidget(btn)
+
+            cards_layout.addWidget(card)
+
+        layout.addLayout(cards_layout)
+        layout.addStretch()
 
     def refresh(self):
         pass
 
-class CreateUserPage(Frame):
-    def __init__(self, parent, controller):
-        super().__init__(parent, bg="#e6f3fa")
+class CreateUserPage(QWidget):
+    def __init__(self, controller):
+        super().__init__()
         self.controller = controller
         self.current_page = 1
         self.users_per_page = 10
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(50, 50, 50, 50)
+        layout.setSpacing(30)
 
-        # Top frame for search and create button
-        top_frame = tk.Frame(self, bg="#e6f3fa")
-        top_frame.pack(fill='x', padx=10, pady=10)
+        # Header
+        header_layout = QHBoxLayout()
+        title = QLabel("Manage Users")
+        title.setFont(QFont("Helvetica, Arial, sans-serif", 32, QFont.Bold))
+        title.setStyleSheet("color: #1f2937; border: none;")
+        header_layout.addWidget(title)
+        header_layout.addStretch()
 
-        ttk.Button(top_frame, text="Create User", command=self.show_create_form).pack(side='left')
-        ttk.Button(top_frame, text="Refresh", command=self.refresh).pack(side='left', padx=10)
-        ttk.Button(top_frame, text="Back", command=lambda: controller.show_frame("HomePage")).pack(side='right')
+        create_btn = QPushButton("New User")
+        create_btn.setFixedWidth(180)
+        create_btn.setMinimumHeight(50)
+        create_btn.clicked.connect(self.show_create_form)
+        header_layout.addWidget(create_btn)
 
-        self.search_var = tk.StringVar()
-        search_entry = ttk.Entry(top_frame, textvariable=self.search_var)
-        search_entry.pack(side='right', padx=10)
-        search_entry.bind('<KeyRelease>', self.search_users)
+        layout.addLayout(header_layout)
+
+        # Search bar
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search users...")
+        self.search_input.setMinimumHeight(50)
+        self.search_input.textChanged.connect(self.search_users)
+        layout.addWidget(self.search_input)
 
         # Users table
-        self.tree = ttk.Treeview(self, columns=('Name', 'Serial', 'DOB'), show='headings')
-        self.tree.heading('Name', text='Full Name')
-        self.tree.heading('Serial', text='Serial Number')
-        self.tree.heading('DOB', text='Date of Birth')
-        self.tree.pack(fill='both', expand=True, padx=10, pady=10)
+        self.table = QTableWidget()
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(['Full Name', 'Serial Number', 'Date of Birth'])
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setAlternatingRowColors(True)
+        layout.addWidget(self.table)
 
         # Pagination
-        pagination_frame = tk.Frame(self, bg="#e6f3fa")
-        pagination_frame.pack(fill='x', pady=10)
-        ttk.Button(pagination_frame, text="Previous", command=self.prev_page).pack(side='left', padx=5)
-        self.page_label = tk.Label(pagination_frame, text="Page 1", bg="#e6f3fa", fg="#2c3e50")
-        self.page_label.pack(side='left', padx=5)
-        ttk.Button(pagination_frame, text="Next", command=self.next_page).pack(side='left', padx=5)
+        pagination_frame = QFrame()
+        pagination_layout = QHBoxLayout(pagination_frame)
+        prev_btn = QPushButton("Previous")
+        prev_btn.setMinimumHeight(50)
+        prev_btn.clicked.connect(self.prev_page)
+        pagination_layout.addWidget(prev_btn)
+
+        self.page_label = QLabel("Page 1")
+        pagination_layout.addWidget(self.page_label)
+
+        next_btn = QPushButton("Next")
+        next_btn.setMinimumHeight(50)
+        next_btn.clicked.connect(self.next_page)
+        pagination_layout.addWidget(next_btn)
+
+        layout.addWidget(pagination_frame)
 
         self.refresh()
 
@@ -205,388 +460,788 @@ class CreateUserPage(Frame):
         self.load_users()
 
     def load_users(self, search_term=""):
-        for item in self.tree.get_children():
-            self.tree.delete(item)
+        try:
+            self.table.setRowCount(0)
+            cursor = self.controller.db.cursor()
+            query = "SELECT name, serial_number, dob FROM users"
+            params = ()
+            if search_term:
+                query += " WHERE name LIKE %s OR serial_number LIKE %s"
+                params = (f"%{search_term}%", f"%{search_term}%")
 
-        cursor = self.controller.db.cursor()
-        query = "SELECT name, serial_number, dob FROM users"
-        params = ()
-        if search_term:
-            query += " WHERE name LIKE %s OR serial_number LIKE %s"
-            params = (f"%{search_term}%", f"%{search_term}%")
+            cursor.execute(query, params)
+            users = cursor.fetchall()
+            cursor.close()
 
-        cursor.execute(query, params)
-        users = cursor.fetchall()
+            start = (self.current_page - 1) * self.users_per_page
+            end = start + self.users_per_page
+            self.table.setRowCount(min(self.users_per_page, len(users[start:end])))
 
-        start = (self.current_page - 1) * self.users_per_page
-        end = start + self.users_per_page
-        for user in users[start:end]:
-            dob = user[2].strftime('%Y-%m-%d') if user[2] else ''
-            self.tree.insert('', 'end', values=(user[0], user[1], dob))
+            for row_idx, user in enumerate(users[start:end]):
+                self.table.setItem(row_idx, 0, QTableWidgetItem(user[0]))
+                self.table.setItem(row_idx, 1, QTableWidgetItem(user[1]))
+                dob = user[2].strftime('%Y-%m-%d') if user[2] else ''
+                self.table.setItem(row_idx, 2, QTableWidgetItem(dob))
 
-        self.page_label.config(text=f"Page {self.current_page}")
+            self.page_label.setText(f"Page {self.current_page}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load users: {e}")
 
-    def search_users(self, event=None):
+    def search_users(self):
         self.current_page = 1
-        self.load_users(self.search_var.get())
+        self.load_users(self.search_input.text())
 
     def prev_page(self):
         if self.current_page > 1:
             self.current_page -= 1
-            self.load_users(self.search_var.get())
+            self.load_users(self.search_input.text())
 
     def next_page(self):
-        cursor = self.controller.db.cursor()
-        cursor.execute("SELECT COUNT(*) FROM users")
-        total_users = cursor.fetchone()[0]
-        if self.current_page * self.users_per_page < total_users:
-            self.current_page += 1
-            self.load_users(self.search_var.get())
+        try:
+            cursor = self.controller.db.cursor()
+            cursor.execute("SELECT COUNT(*) FROM users")
+            total_users = cursor.fetchone()[0]
+            cursor.close()
+            if self.current_page * self.users_per_page < total_users:
+                self.current_page += 1
+                self.load_users(self.search_input.text())
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to navigate: {e}")
 
     def show_create_form(self):
-        window = tk.Toplevel(bg="#e6f3fa")
-        window.title("Create User")
-        window.geometry("400x300")
+        dialog = QWidget()
+        dialog.setWindowTitle("Create User")
+        dialog.setFixedSize(500, 500)
+        dialog.setStyleSheet("background-color: #f0f2f5;")
 
-        frame = tk.Frame(window, bg="#ffffff", padx=20, pady=20, relief="groove", bd=2)
-        frame.pack(expand=True, fill='both')
+        layout = QVBoxLayout(dialog)
+        frame = QFrame()
+        frame_layout = QVBoxLayout(frame)
+        frame_layout.setSpacing(20)
+        frame_layout.setContentsMargins(30, 30, 30, 30)
 
-        tk.Label(frame, text="Create New User", font=('Helvetica', 16, 'bold'), bg="#ffffff", fg="#2c3e50").pack(pady=10)
+        title = QLabel("Create New User")
+        title.setFont(QFont("Helvetica, Arial, sans-serif", 24, QFont.Bold))
+        title.setStyleSheet("color: #1f2937; border: none;")
+        frame_layout.addWidget(title)
 
-        tk.Label(frame, text="Name:", bg="#ffffff").pack()
-        name = ttk.Entry(frame)
-        name.pack(pady=5, fill='x')
+        name = QLineEdit()
+        name.setPlaceholderText("Full Name")
+        name.setMinimumHeight(50)
+        frame_layout.addWidget(name)
 
-        tk.Label(frame, text="Serial Number:", bg="#ffffff").pack()
-        serial = ttk.Entry(frame)
-        serial.pack(pady=5, fill='x')
+        serial = QLineEdit()
+        serial.setPlaceholderText("Serial Number")
+        serial.setMinimumHeight(50)
+        frame_layout.addWidget(serial)
 
-        tk.Label(frame, text="Date of Birth:", bg="#ffffff").pack()
-        dob = DateEntry(frame)
-        dob.pack(pady=5)
+        dob = QDateEdit()
+        dob.setCalendarPopup(True)
+        dob.setDisplayFormat("yyyy-MM-dd")
+        dob.setMinimumHeight(50)
+        frame_layout.addWidget(dob)
 
-        def submit():
-            try:
-                cursor = self.controller.db.cursor()
-                cursor.execute("""
-                    INSERT INTO users (name, serial_number, dob, password)
-                    VALUES (%s, %s, %s, %s)
-                """, (name.get(), serial.get(), dob.get_date(), str(uuid.uuid4())[:8]))
-                self.controller.db.commit()
-                messagebox.showinfo("Success", "User created successfully")
-                self.refresh()
-                window.destroy()
-            except mysql.connector.Error as err:
-                messagebox.showerror("Error", f"Database error: {err}")
+        submit_btn = QPushButton("Create User")
+        submit_btn.setMinimumHeight(50)
+        submit_btn.clicked.connect(lambda: self.submit_user(name.text(), serial.text(), dob.date().toPyDate(), dialog))
+        frame_layout.addWidget(submit_btn)
 
-        ttk.Button(frame, text="Submit", command=submit).pack(pady=20)
+        layout.addWidget(frame)
+        dialog.show()
 
-class BookAuthorPage(Frame):
-    def __init__(self, parent, controller):
-        super().__init__(parent, bg="#e6f3fa")
+    def submit_user(self, name, serial, dob, dialog):
+        try:
+            if not name or not serial:
+                QMessageBox.critical(self, "Error", "Name and serial number are required")
+                return
+
+            cursor = self.controller.db.cursor()
+            cursor.execute("""
+                INSERT INTO users (name, serial_number, dob, password)
+                VALUES (%s, %s, %s, %s)
+            """, (name, serial, dob, str(uuid.uuid4())[:8]))
+            self.controller.db.commit()
+            cursor.close()
+            QMessageBox.information(self, "Success", "User created successfully")
+            self.refresh()
+            dialog.close()
+        except mysql.connector.Error as err:
+            QMessageBox.critical(self, "Error", f"Database error: {err}")
+
+class BookAuthorPage(QWidget):
+    def __init__(self, controller):
+        super().__init__()
         self.controller = controller
+        self.current_page = 1
+        self.books_per_page = 10
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(50, 50, 50, 50)
+        layout.setSpacing(30)
 
-        # Top buttons
-        top_frame = tk.Frame(self, bg="#e6f3fa")
-        top_frame.pack(fill='x', padx=10, pady=10)
-        ttk.Button(top_frame, text="Refresh", command=self.refresh).pack(side='left')
-        ttk.Button(top_frame, text="Add New", command=self.show_add_form).pack(side='left', padx=10)
-        ttk.Button(top_frame, text="Back", command=lambda: controller.show_frame("HomePage")).pack(side='right')
+        # Header
+        header_layout = QHBoxLayout()
+        title = QLabel("Manage Books")
+        title.setFont(QFont("Helvetica, Arial, sans-serif", 32, QFont.Bold))
+        title.setStyleSheet("color: #1f2937; border: none;")
+        header_layout.addWidget(title)
+        header_layout.addStretch()
+
+        view_authors_btn = QPushButton("View Authors")
+        view_authors_btn.setFixedWidth(200)
+        view_authors_btn.setMinimumHeight(50)
+        view_authors_btn.clicked.connect(self.show_view_authors)
+        header_layout.addWidget(view_authors_btn)
+
+        add_author_btn = QPushButton("Add New Author")
+        add_author_btn.setFixedWidth(200)
+        add_author_btn.setMinimumHeight(50)
+        add_author_btn.clicked.connect(self.show_add_author_form)
+        header_layout.addWidget(add_author_btn)
+
+        add_book_btn = QPushButton("Add New Book")
+        add_book_btn.setFixedWidth(200)
+        add_book_btn.setMinimumHeight(50)
+        add_book_btn.clicked.connect(self.show_add_book_form)
+        header_layout.addWidget(add_book_btn)
+
+        layout.addLayout(header_layout)
+
+        # Search bar
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search books...")
+        self.search_input.setMinimumHeight(50)
+        self.search_input.textChanged.connect(self.search_books)
+        layout.addWidget(self.search_input)
 
         # Books table
-        self.tree = ttk.Treeview(self, columns=('Serial', 'Author', 'Title', 'BookSerial', 'Occupied'), show='headings')
-        self.tree.heading('Serial', text='Serial')
-        self.tree.heading('Author', text='Author')
-        self.tree.heading('Title', text='Book Title')
-        self.tree.heading('BookSerial', text='Book Serial')
-        self.tree.heading('Occupied', text='Occupied By')
-        self.tree.pack(fill='both', expand=True, padx=10, pady=10)
+        self.table = QTableWidget()
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(['Serial', 'Author', 'Book Title', 'Book Serial', 'Occupied By'])
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setAlternatingRowColors(True)
+        layout.addWidget(self.table)
+
+        # Pagination
+        pagination_frame = QFrame()
+        pagination_layout = QHBoxLayout(pagination_frame)
+        prev_btn = QPushButton("Previous")
+        prev_btn.setMinimumHeight(50)
+        prev_btn.clicked.connect(self.prev_page)
+        pagination_layout.addWidget(prev_btn)
+
+        self.page_label = QLabel("Page 1")
+        pagination_layout.addWidget(self.page_label)
+
+        next_btn = QPushButton("Next")
+        next_btn.setMinimumHeight(50)
+        next_btn.clicked.connect(self.next_page)
+        pagination_layout.addWidget(next_btn)
+
+        layout.addWidget(pagination_frame)
 
         self.refresh()
 
     def refresh(self):
-        for item in self.tree.get_children():
-            self.tree.delete(item)
+        self.load_books()
 
-        cursor = self.controller.db.cursor()
-        cursor.execute("""
-            SELECT b.serial_number, a.name, b.title, b.serial_number, 
-                   COALESCE(u.name, 'Library') as occupied_by
-            FROM books b
-            JOIN authors a ON b.author_id = a.id
-            LEFT JOIN transactions t ON b.id = t.book_id AND t.return_date IS NULL
-            LEFT JOIN users u ON t.user_id = u.id
-        """)
-        for row in cursor.fetchall():
-            self.tree.insert('', 'end', values=row)
+    def load_books(self, search_term=""):
+        try:
+            self.table.setRowCount(0)
+            cursor = self.controller.db.cursor()
+            query = """
+                SELECT b.serial_number, a.name, b.title, b.serial_number, 
+                       COALESCE(u.name, 'Library') as occupied_by
+                FROM books b
+                JOIN authors a ON b.author_id = a.id
+                LEFT JOIN transactions t ON b.id = t.book_id AND t.return_date IS NULL
+                LEFT JOIN users u ON t.user_id = u.id
+            """
+            params = ()
+            if search_term:
+                query += " WHERE b.title LIKE %s OR a.name LIKE %s"
+                params = (f"%{search_term}%", f"%{search_term}%")
 
-    def show_add_form(self):
-        window = tk.Toplevel(bg="#e6f3fa")
-        window.title("Add Book/Author")
-        window.geometry("400x400")
+            cursor.execute(query, params)
+            books = cursor.fetchall()
+            cursor.close()
 
-        frame = tk.Frame(window, bg="#ffffff", padx=20, pady=20, relief="groove", bd=2)
-        frame.pack(expand=True, fill='both')
+            start = (self.current_page - 1) * self.books_per_page
+            end = start + self.books_per_page
+            self.table.setRowCount(min(self.books_per_page, len(books[start:end])))
 
-        tk.Label(frame, text="Add Author/Book", font=('Helvetica', 16, 'bold'), bg="#ffffff", fg="#2c3e50").pack(pady=10)
+            for row_idx, book in enumerate(books[start:end]):
+                for col_idx, value in enumerate(book):
+                    self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(value)))
 
-        tk.Label(frame, text="Author Name:", bg="#ffffff").pack()
-        self.author_name = ttk.Entry(frame)
-        self.author_name.pack(pady=5, fill='x')
+            self.page_label.setText(f"Page {self.current_page}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load books: {e}")
 
-        ttk.Button(frame, text="Add Author", command=self.add_author).pack(pady=10)
+    def search_books(self):
+        self.current_page = 1
+        self.load_books(self.search_input.text())
 
-        tk.Label(frame, text="Author:", bg="#ffffff").pack()
-        self.author_var = tk.StringVar()
-        self.author_dropdown = ttk.Combobox(frame, textvariable=self.author_var)
+    def prev_page(self):
+        if self.current_page > 1:
+            self.current_page -= 1
+            self.load_books(self.search_input.text())
+
+    def next_page(self):
+        try:
+            cursor = self.controller.db.cursor()
+            query = "SELECT COUNT(*) FROM books"
+            if self.search_input.text():
+                query += " WHERE title LIKE %s OR author_id IN (SELECT id FROM authors WHERE name LIKE %s)"
+                cursor.execute(query, (f"%{self.search_input.text()}%", f"%{self.search_input.text()}%"))
+            else:
+                cursor.execute(query)
+            total_books = cursor.fetchone()[0]
+            cursor.close()
+            if self.current_page * self.books_per_page < total_books:
+                self.current_page += 1
+                self.load_books(self.search_input.text())
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to navigate: {e}")
+
+    def show_view_authors(self):
+        dialog = QWidget()
+        dialog.setWindowTitle("View Authors")
+        dialog.setFixedSize(600, 600)
+        dialog.setStyleSheet("background-color: #f0f2f5;")
+
+        layout = QVBoxLayout(dialog)
+        frame = QFrame()
+        frame_layout = QVBoxLayout(frame)
+        frame_layout.setSpacing(20)
+        frame_layout.setContentsMargins(30, 30, 30, 30)
+
+        title = QLabel("Authors List")
+        title.setFont(QFont("Helvetica, Arial, sans-serif", 24, QFont.Bold))
+        title.setStyleSheet("color: #1f2937; border: none;")
+        frame_layout.addWidget(title)
+
+        # Authors table
+        self.authors_table = QTableWidget()
+        self.authors_table.setColumnCount(2)
+        self.authors_table.setHorizontalHeaderLabels(['Author Name', 'Details'])
+        self.authors_table.horizontalHeader().setStretchLastSection(True)
+        self.authors_table.setAlternatingRowColors(True)
+        frame_layout.addWidget(self.authors_table)
+
+        # Pagination
+        pagination_frame = QFrame()
+        pagination_layout = QHBoxLayout(pagination_frame)
+        prev_btn = QPushButton("Previous")
+        prev_btn.setMinimumHeight(50)
+        prev_btn.clicked.connect(lambda: self.prev_author_page(dialog))
+        pagination_layout.addWidget(prev_btn)
+
+        self.author_page_label = QLabel("Page 1")
+        pagination_layout.addWidget(self.author_page_label)
+
+        next_btn = QPushButton("Next")
+        next_btn.setMinimumHeight(50)
+        next_btn.clicked.connect(lambda: self.next_author_page(dialog))
+        pagination_layout.addWidget(next_btn)
+
+        frame_layout.addWidget(pagination_frame)
+
+        layout.addWidget(frame)
+        self.current_author_page = 1
+        self.authors_per_page = 10
+        self.load_authors(dialog)
+        dialog.show()
+
+    def load_authors(self, dialog):
+        try:
+            self.authors_table.setRowCount(0)
+            cursor = self.controller.db.cursor()
+            cursor.execute("SELECT name, details FROM authors")
+            authors = cursor.fetchall()
+            cursor.close()
+
+            start = (self.current_author_page - 1) * self.authors_per_page
+            end = start + self.authors_per_page
+            self.authors_table.setRowCount(min(self.authors_per_page, len(authors[start:end])))
+
+            for row_idx, author in enumerate(authors[start:end]):
+                self.authors_table.setItem(row_idx, 0, QTableWidgetItem(author[0]))
+                self.authors_table.setItem(row_idx, 1, QTableWidgetItem(author[1] if author[1] else ''))
+
+            self.author_page_label.setText(f"Page {self.current_author_page}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load authors: {e}")
+
+    def prev_author_page(self, dialog):
+        if self.current_author_page > 1:
+            self.current_author_page -= 1
+            self.load_authors(dialog)
+
+    def next_author_page(self, dialog):
+        try:
+            cursor = self.controller.db.cursor()
+            cursor.execute("SELECT COUNT(*) FROM authors")
+            total_authors = cursor.fetchone()[0]
+            cursor.close()
+            if self.current_author_page * self.authors_per_page < total_authors:
+                self.current_author_page += 1
+                self.load_authors(dialog)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to navigate: {e}")
+
+    def show_add_author_form(self):
+        dialog = QWidget()
+        dialog.setWindowTitle("Add Author")
+        dialog.setFixedSize(500, 550)
+        dialog.setStyleSheet("background-color: #f0f2f5;")
+
+        layout = QVBoxLayout(dialog)
+        frame = QFrame()
+        frame_layout = QVBoxLayout(frame)
+        frame_layout.setSpacing(20)
+        frame_layout.setContentsMargins(30, 30, 30, 30)
+
+        title = QLabel("Add New Author")
+        title.setFont(QFont("Helvetica, Arial, sans-serif", 24, QFont.Bold))
+        title.setStyleSheet("color: #1f2937; border: none;")
+        frame_layout.addWidget(title)
+
+        self.author_name = QLineEdit()
+        self.author_name.setPlaceholderText("Author Name")
+        self.author_name.setMinimumHeight(50)
+        frame_layout.addWidget(self.author_name)
+
+        self.author_details = QTextEdit()
+        self.author_details.setPlaceholderText("Author Details (e.g., bio, nationality)")
+        self.author_details.setMinimumHeight(120)
+        frame_layout.addWidget(self.author_details)
+
+        add_author_btn = QPushButton("Add Author")
+        add_author_btn.setMinimumHeight(50)
+        add_author_btn.clicked.connect(lambda: self.add_author(dialog))
+        frame_layout.addWidget(add_author_btn)
+
+        layout.addWidget(frame)
+        dialog.show()
+
+    def show_add_book_form(self):
+        dialog = QWidget()
+        dialog.setWindowTitle("Add Book")
+        dialog.setFixedSize(500, 500)
+        dialog.setStyleSheet("background-color: #f0f2f5;")
+
+        layout = QVBoxLayout(dialog)
+        frame = QFrame()
+        frame_layout = QVBoxLayout(frame)
+        frame_layout.setSpacing(20)
+        frame_layout.setContentsMargins(30, 30, 30, 30)
+
+        title = QLabel("Add New Book")
+        title.setFont(QFont("Helvetica, Arial, sans-serif", 24, QFont.Bold))
+        title.setStyleSheet("color: #1f2937; border: none;")
+        frame_layout.addWidget(title)
+
+        self.author_dropdown = QComboBox()
+        self.author_dropdown.setMinimumHeight(50)
         self.refresh_authors()
-        self.author_dropdown.pack(pady=5, fill='x')
+        frame_layout.addWidget(self.author_dropdown)
 
-        tk.Label(frame, text="Book Title:", bg="#ffffff").pack()
-        self.book_title = ttk.Entry(frame)
-        self.book_title.pack(pady=5, fill='x')
+        self.book_title = QLineEdit()
+        self.book_title.setPlaceholderText("Book Title")
+        self.book_title.setMinimumHeight(50)
+        frame_layout.addWidget(self.book_title)
 
-        tk.Label(frame, text="Book Serial:", bg="#ffffff").pack()
-        self.book_serial = ttk.Entry(frame)
-        self.book_serial.pack(pady=5, fill='x')
+        self.book_serial = QLineEdit()
+        self.book_serial.setPlaceholderText("Book Serial")
+        self.book_serial.setMinimumHeight(50)
+        frame_layout.addWidget(self.book_serial)
 
-        ttk.Button(frame, text="Add Book", command=self.add_book).pack(pady=20)
+        add_book_btn = QPushButton("Add Book")
+        add_book_btn.setMinimumHeight(50)
+        add_book_btn.clicked.connect(lambda: self.add_book(dialog))
+        frame_layout.addWidget(add_book_btn)
+
+        layout.addWidget(frame)
+        dialog.show()
 
     def refresh_authors(self):
-        cursor = self.controller.db.cursor()
-        cursor.execute("SELECT name FROM authors")
-        self.author_dropdown['values'] = [row[0] for row in cursor.fetchall()]
-
-    def add_author(self):
-        name = self.author_name.get()
-        if name:
-            try:
-                cursor = self.controller.db.cursor()
-                cursor.execute("INSERT INTO authors (name) VALUES (%s)", (name,))
-                self.controller.db.commit()
-                self.refresh_authors()
-                messagebox.showinfo("Success", "Author added")
-                self.author_name.delete(0, tk.END)
-                self.refresh()
-            except mysql.connector.Error as err:
-                messagebox.showerror("Error", f"Database error: {err}")
-
-    def add_book(self):
-        author_name = self.author_var.get()
-        title = self.book_title.get()
-        serial = self.book_serial.get()
-
-        if not all([author_name, title, serial]):
-            messagebox.showerror("Error", "All fields required")
-            return
-
-        cursor = self.controller.db.cursor()
-        cursor.execute("SELECT id FROM authors WHERE name=%s", (author_name,))
-        result = cursor.fetchone()
-        if not result:
-            messagebox.showerror("Error", "Author not found")
-            return
-        author_id = result[0]
-
         try:
+            self.author_dropdown.clear()
+            cursor = self.controller.db.cursor()
+            cursor.execute("SELECT name FROM authors")
+            authors = [row[0] for row in cursor.fetchall()]
+            self.author_dropdown.addItems(authors)
+            cursor.close()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to refresh authors: {e}")
+
+    def add_author(self, dialog):
+        try:
+            name = self.author_name.text().strip()
+            details = self.author_details.toPlainText().strip()
+
+            if not name:
+                QMessageBox.critical(self, "Error", "Author name is required")
+                return
+
+            cursor = self.controller.db.cursor()
+            cursor.execute("INSERT INTO authors (name, details) VALUES (%s, %s)", (name, details))
+            self.controller.db.commit()
+            cursor.close()
+            QMessageBox.information(self, "Success", "Author added successfully")
+            self.author_name.clear()
+            self.author_details.clear()
+            self.refresh_authors()
+            dialog.close()
+            self.refresh()
+        except mysql.connector.Error as err:
+            QMessageBox.critical(self, "Error", f"Database error: {err}")
+
+    def add_book(self, dialog):
+        try:
+            author_name = self.author_dropdown.currentText()
+            title = self.book_title.text().strip()
+            serial = self.book_serial.text().strip()
+
+            if not all([author_name, title, serial]):
+                QMessageBox.critical(self, "Error", "All fields are required")
+                return
+
+            cursor = self.controller.db.cursor()
+            cursor.execute("SELECT id FROM authors WHERE name=%s", (author_name,))
+            result = cursor.fetchone()
+            if not result:
+                QMessageBox.critical(self, "Error", "Author not found")
+                cursor.close()
+                return
+            author_id = result[0]
+
             cursor.execute("""
                 INSERT INTO books (serial_number, title, author_id)
                 VALUES (%s, %s, %s)
             """, (serial, title, author_id))
             self.controller.db.commit()
-            messagebox.showinfo("Success", "Book added")
-            self.book_title.delete(0, tk.END)
-            self.book_serial.delete(0, tk.END)
-            self.author_var.set('')
+            cursor.close()
+            QMessageBox.information(self, "Success", "Book added successfully")
+            self.book_title.clear()
+            self.book_serial.clear()
+            self.author_dropdown.setCurrentIndex(-1)
+            dialog.close()
             self.refresh()
         except mysql.connector.Error as err:
-            messagebox.showerror("Error", f"Database error: {err}")
+            QMessageBox.critical(self, "Error", f"Database error: {err}")
 
-class AssignReturnPage(Frame):
-    def __init__(self, parent, controller):
-        super().__init__(parent, bg="#e6f3fa")
+class AssignReturnPage(QWidget):
+    def __init__(self, controller):
+        super().__init__()
         self.controller = controller
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(50, 50, 50, 50)
+        layout.setSpacing(30)
 
-        top_frame = tk.Frame(self, bg="#e6f3fa")
-        top_frame.pack(fill='x', padx=10, pady=10)
-        ttk.Button(top_frame, text="Refresh", command=self.refresh).pack(side='left')
-        ttk.Button(top_frame, text="Back", command=lambda: controller.show_frame("HomePage")).pack(side='right')
+        # Header
+        title = QLabel("Book Transactions")
+        title.setFont(QFont("Helvetica, Arial, sans-serif", 32, QFont.Bold))
+        title.setStyleSheet("color: #1f2937; border: none;")
+        layout.addWidget(title)
 
-        # Assign Book Section
-        assign_frame = tk.Frame(self, bg="#ffffff", padx=20, pady=20, relief="groove", bd=2)
-        assign_frame.pack(fill='x', padx=10, pady=10)
+        # Split layout
+        split_layout = QHBoxLayout()
+        split_layout.setSpacing(30)
 
-        tk.Label(assign_frame, text="Assign Book", font=('Helvetica', 14, 'bold'), bg="#ffffff", fg="#2c3e50").pack()
-        self.user_var = tk.StringVar()
-        self.user_dropdown = ttk.Combobox(assign_frame, textvariable=self.user_var)
-        self.user_dropdown.pack(pady=5, fill='x')
+        # Assign frame
+        assign_frame = QFrame()
+        assign_layout = QVBoxLayout(assign_frame)
+        assign_layout.setSpacing(20)
+        assign_layout.setContentsMargins(30, 30, 30, 30)
 
-        self.book_var = tk.StringVar()
-        self.book_dropdown = ttk.Combobox(assign_frame, textvariable=self.book_var)
-        self.book_dropdown.pack(pady=5, fill='x')
+        assign_title = QLabel("Assign Book")
+        assign_title.setFont(QFont("Helvetica, Arial, sans-serif", 24, QFont.Bold))
+        assign_title.setStyleSheet("color: #1f2937; border: none;")
+        assign_layout.addWidget(assign_title)
 
-        tk.Label(assign_frame, text="Issue Date:", bg="#ffffff").pack()
-        self.issue_date = DateEntry(assign_frame)
-        self.issue_date.pack(pady=5)
+        self.user_input = QLineEdit()
+        self.user_input.setPlaceholderText("Type to select user...")
+        self.user_input.setMinimumHeight(50)
+        assign_layout.addWidget(self.user_input)
 
-        ttk.Button(assign_frame, text="Assign Book", command=self.assign_book).pack(pady=10)
+        self.book_input = QLineEdit()
+        self.book_input.setPlaceholderText("Type to select book...")
+        self.book_input.setMinimumHeight(50)
+        assign_layout.addWidget(self.book_input)
 
-        # Return Book Section
-        return_frame = tk.Frame(self, bg="#ffffff", padx=20, pady=20, relief="groove", bd=2)
-        return_frame.pack(fill='x', padx=10, pady=10)
+        self.issue_date = QDateEdit()
+        self.issue_date.setCalendarPopup(True)
+        self.issue_date.setDisplayFormat("yyyy-MM-dd")
+        self.issue_date.setMinimumHeight(50)
+        assign_layout.addWidget(self.issue_date)
 
-        tk.Label(return_frame, text="Return Book", font=('Helvetica', 14, 'bold'), bg="#ffffff", fg="#2c3e50").pack()
-        self.return_user_var = tk.StringVar()
-        self.return_user_dropdown = ttk.Combobox(return_frame, textvariable=self.return_user_var)
-        self.return_user_dropdown.pack(pady=5, fill='x')
+        assign_btn = QPushButton("Assign Book")
+        assign_btn.setMinimumHeight(50)
+        assign_btn.clicked.connect(self.assign_book)
+        assign_layout.addWidget(assign_btn)
 
-        self.return_book_var = tk.StringVar()
-        self.return_book_dropdown = ttk.Combobox(return_frame, textvariable=self.return_book_var)
-        self.return_book_dropdown.pack(pady=5, fill='x')
+        split_layout.addWidget(assign_frame)
 
-        tk.Label(return_frame, text="Return Date:", bg="#ffffff").pack()
-        self.return_date = DateEntry(return_frame)
-        self.return_date.pack(pady=5)
+        # Return frame
+        return_frame = QFrame()
+        return_layout = QVBoxLayout(return_frame)
+        return_layout.setSpacing(20)
+        return_layout.setContentsMargins(30, 30, 30, 30)
 
-        ttk.Button(return_frame, text="Return Book", command=self.return_book).pack(pady=10)
+        return_title = QLabel("Return Book")
+        return_title.setFont(QFont("Helvetica, Arial, sans-serif", 24, QFont.Bold))
+        return_title.setStyleSheet("color: #1f2937; border: none;")
+        return_layout.addWidget(return_title)
+
+        self.return_user_input = QLineEdit()
+        self.return_user_input.setPlaceholderText("Type to select user...")
+        self.return_user_input.setMinimumHeight(50)
+        self.return_user_input.textChanged.connect(self.update_return_books)
+        return_layout.addWidget(self.return_user_input)
+
+        self.return_book_input = QLineEdit()
+        self.return_book_input.setPlaceholderText("Type to select book...")
+        self.return_book_input.setMinimumHeight(50)
+        return_layout.addWidget(self.return_book_input)
+
+        self.return_date = QDateEdit()
+        self.return_date.setCalendarPopup(True)
+        self.return_date.setDisplayFormat("yyyy-MM-dd")
+        self.return_date.setMinimumHeight(50)
+        return_layout.addWidget(self.return_date)
+
+        return_btn = QPushButton("Return Book")
+        return_btn.setMinimumHeight(50)
+        return_btn.clicked.connect(self.return_book)
+        return_layout.addWidget(return_btn)
+
+        split_layout.addWidget(return_frame)
+        layout.addLayout(split_layout)
+        layout.addStretch()
 
         self.refresh()
 
     def refresh(self):
-        self.refresh_users()
-        self.refresh_books()
-        self.user_var.set('')
-        self.book_var.set('')
-        self.return_user_var.set('')
-        self.return_book_var.set('')
-        self.issue_date.set_date(datetime.now())
-        self.return_date.set_date(datetime.now())
+        self.setup_completers()
+        self.update_return_books()
+        self.user_input.clear()
+        self.book_input.clear()
+        self.return_user_input.clear()
+        self.return_book_input.clear()
+        self.issue_date.setDate(QDate.currentDate())
+        self.return_date.setDate(QDate.currentDate())
 
-    def refresh_users(self):
-        cursor = self.controller.db.cursor()
-        cursor.execute("SELECT name FROM users")
-        users = [row[0] for row in cursor.fetchall()]
-        self.user_dropdown['values'] = users
-        self.return_user_dropdown['values'] = users
+    def setup_completers(self):
+        try:
+            cursor = self.controller.db.cursor()
+            cursor.execute("SELECT name FROM users")
+            users = [row[0] for row in cursor.fetchall()]
+            cursor.execute("SELECT title FROM books")
+            books = [row[0] for row in cursor.fetchall()]
+            cursor.close()
 
-    def refresh_books(self):
-        cursor = self.controller.db.cursor()
-        cursor.execute("SELECT title FROM books")
-        books = [row[0] for row in cursor.fetchall()]
-        self.book_dropdown['values'] = books
-        self.return_book_dropdown['values'] = books
+            user_model = QStringListModel(users)
+            book_model = QStringListModel(books)
+
+            user_completer = QCompleter(user_model, self)
+            user_completer.setCaseSensitivity(Qt.CaseInsensitive)
+            self.user_input.setCompleter(user_completer)
+            self.return_user_input.setCompleter(user_completer)
+
+            book_completer = QCompleter(book_model, self)
+            book_completer.setCaseSensitivity(Qt.CaseInsensitive)
+            self.book_input.setCompleter(book_completer)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to setup completers: {e}")
+
+    def update_return_books(self):
+        try:
+            user_name = self.return_user_input.text().strip()
+            if not user_name:
+                self.return_book_input.clear()
+                self.return_book_input.setCompleter(None)
+                return
+
+            cursor = self.controller.db.cursor()
+            cursor.execute("""
+                SELECT b.title 
+                FROM books b
+                JOIN transactions t ON b.id = t.book_id
+                JOIN users u ON t.user_id = u.id
+                WHERE u.name = %s AND t.return_date IS NULL
+            """, (user_name,))
+            books = [row[0] for row in cursor.fetchall()]
+            cursor.close()
+
+            book_model = QStringListModel(books)
+            book_completer = QCompleter(book_model, self)
+            book_completer.setCaseSensitivity(Qt.CaseInsensitive)
+            self.return_book_input.setCompleter(book_completer)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to refresh return books: {e}")
 
     def assign_book(self):
-        user_name = self.user_var.get()
-        book_title = self.book_var.get()
-        issue_date = self.issue_date.get_date()
-
-        if not user_name or not book_title:
-            messagebox.showerror("Error", "Please select both user and book")
-            return
-
-        cursor = self.controller.db.cursor()
         try:
+            user_name = self.user_input.text().strip()
+            book_title = self.book_input.text().strip()
+            issue_date = self.issue_date.date().toPyDate()
+
+            if not user_name or not book_title:
+                QMessageBox.critical(self, "Error", "Please select both user and book")
+                return
+
+            cursor = self.controller.db.cursor()
             cursor.execute("SELECT id FROM users WHERE name=%s", (user_name,))
-            user_id = cursor.fetchone()[0]
+            user_result = cursor.fetchone()
+            if not user_result:
+                QMessageBox.critical(self, "Error", "User not found")
+                cursor.close()
+                return
+            user_id = user_result[0]
 
             cursor.execute("SELECT id FROM books WHERE title=%s", (book_title,))
-            book_id = cursor.fetchone()[0]
+            book_result = cursor.fetchone()
+            if not book_result:
+                QMessageBox.critical(self, "Error", "Book not found")
+                cursor.close()
+                return
+            book_id = book_result[0]
 
             cursor.execute("""
                 INSERT INTO transactions (user_id, book_id, issue_date)
                 VALUES (%s, %s, %s)
             """, (user_id, book_id, issue_date))
             self.controller.db.commit()
-            messagebox.showinfo("Success", "Book assigned")
+            cursor.close()
+            QMessageBox.information(self, "Success", "Book assigned")
             self.refresh()
         except mysql.connector.Error as err:
-            messagebox.showerror("Error", f"Database error: {err}")
+            QMessageBox.critical(self, "Error", f"Database error: {err}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to assign book: {e}")
 
     def return_book(self):
-        user_name = self.return_user_var.get()
-        book_title = self.return_book_var.get()
-        return_date = self.return_date.get_date()
-
-        if not user_name or not book_title:
-            messagebox.showerror("Error", "Please select both user and book")
-            return
-
-        cursor = self.controller.db.cursor()
         try:
+            user_name = self.return_user_input.text().strip()
+            book_title = self.return_book_input.text().strip()
+            return_date = self.return_date.date().toPyDate()
+
+            if not user_name or not book_title:
+                QMessageBox.critical(self, "Error", "Please select both user and book")
+                return
+
+            cursor = self.controller.db.cursor()
             cursor.execute("SELECT id FROM users WHERE name=%s", (user_name,))
-            user_id = cursor.fetchone()[0]
+            user_result = cursor.fetchone()
+            if not user_result:
+                QMessageBox.critical(self, "Error", "User not found")
+                cursor.close()
+                return
+            user_id = user_result[0]
 
             cursor.execute("SELECT id FROM books WHERE title=%s", (book_title,))
-            book_id = cursor.fetchone()[0]
+            book_result = cursor.fetchone()
+            if not book_result:
+                QMessageBox.critical(self, "Error", "Book not found")
+                cursor.close()
+                return
+            book_id = book_result[0]
 
             cursor.execute("""
                 UPDATE transactions 
                 SET return_date=%s 
                 WHERE user_id=%s AND book_id=%s AND return_date IS NULL
             """, (return_date, user_id, book_id))
+            if cursor.rowcount == 0:
+                QMessageBox.critical(self, "Error", "No active transaction found for this book and user")
+                cursor.close()
+                return
             self.controller.db.commit()
-            messagebox.showinfo("Success", "Book returned")
+            cursor.close()
+            QMessageBox.information(self, "Success", "Book returned")
             self.refresh()
         except mysql.connector.Error as err:
-            messagebox.showerror("Error", f"Database error: {err}")
+            QMessageBox.critical(self, "Error", f"Database error: {err}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to return book: {e}")
 
-class AdminPanelPage(Frame):
-    def __init__(self, parent, controller):
-        super().__init__(parent, bg="#e6f3fa")
+class AdminPanelPage(QWidget):
+    def __init__(self, controller):
+        super().__init__()
         self.controller = controller
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(50, 50, 50, 50)
+        layout.setSpacing(30)
 
-        frame = tk.Frame(self, bg="#ffffff", padx=20, pady=20, relief="groove", bd=2)
-        frame.pack(expand=True, fill='both', padx=10, pady=10)
+        # Header
+        title = QLabel("Admin Panel")
+        title.setFont(QFont("Helvetica, Arial, sans-serif", 32, QFont.Bold))
+        title.setStyleSheet("color: #1f2937; border: none;")
+        layout.addWidget(title)
 
-        top_frame = tk.Frame(frame, bg="#ffffff")
-        top_frame.pack(fill='x', pady=10)
-        ttk.Button(top_frame, text="Refresh", command=self.refresh).pack(side='left')
-        ttk.Button(top_frame, text="Back", command=lambda: controller.show_frame("HomePage")).pack(side='right')
+        # Form
+        frame = QFrame()
+        frame_layout = QVBoxLayout(frame)
+        frame_layout.setSpacing(20)
+        frame_layout.setContentsMargins(30, 30, 30, 30)
 
-        tk.Label(frame, text="Admin Panel", font=('Helvetica', 16, 'bold'), bg="#ffffff", fg="#2c3e50").pack(pady=10)
-        self.user_var = tk.StringVar()
-        self.user_dropdown = ttk.Combobox(frame, textvariable=self.user_var)
-        self.user_dropdown.pack(pady=10, fill='x')
+        self.user_dropdown = QComboBox()
+        self.user_dropdown.setMinimumHeight(50)
+        frame_layout.addWidget(self.user_dropdown)
 
-        tk.Label(frame, text="Password:", bg="#ffffff").pack()
-        self.password = ttk.Entry(frame, show="*")
-        self.password.pack(pady=5, fill='x')
+        self.password = QLineEdit()
+        self.password.setEchoMode(QLineEdit.Password)
+        self.password.setPlaceholderText("New Password")
+        self.password.setMinimumHeight(50)
+        frame_layout.addWidget(self.password)
 
-        tk.Label(frame, text="Confirm Password:", bg="#ffffff").pack()
-        self.confirm_password = ttk.Entry(frame, show="*")
-        self.confirm_password.pack(pady=5, fill='x')
+        self.confirm_password = QLineEdit()
+        self.confirm_password.setEchoMode(QLineEdit.Password)
+        self.confirm_password.setPlaceholderText("Confirm Password")
+        self.confirm_password.setMinimumHeight(50)
+        frame_layout.addWidget(self.confirm_password)
 
-        ttk.Button(frame, text="Make Admin", command=self.make_admin).pack(pady=20)
+        make_admin_btn = QPushButton("Grant Admin Access")
+        make_admin_btn.setMinimumHeight(50)
+        make_admin_btn.clicked.connect(self.make_admin)
+        frame_layout.addWidget(make_admin_btn)
+
+        layout.addWidget(frame)
+        layout.addStretch()
 
         self.refresh_users()
 
     def refresh(self):
         self.refresh_users()
-        self.user_var.set('')
-        if hasattr(self, 'password'):
-            self.password.delete(0, tk.END)
-        if hasattr(self, 'confirm_password'):
-            self.confirm_password.delete(0, tk.END)
+        self.user_dropdown.setCurrentIndex(-1)
+        self.password.clear()
+        self.confirm_password.clear()
 
     def refresh_users(self):
-        cursor = self.controller.db.cursor()
-        cursor.execute("SELECT name FROM users WHERE is_admin=FALSE")
-        self.user_dropdown['values'] = [row[0] for row in cursor.fetchall()]
+        try:
+            self.user_dropdown.clear()
+            cursor = self.controller.db.cursor()
+            cursor.execute("SELECT name FROM users WHERE is_admin=FALSE")
+            users = [row[0] for row in cursor.fetchall()]
+            self.user_dropdown.addItems(users)
+            cursor.close()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to refresh users: {e}")
 
     def make_admin(self):
-        user_name = self.user_var.get()
-        password = self.password.get()
-        confirm_password = self.confirm_password.get()
-
-        if not user_name:
-            messagebox.showerror("Error", "Please select a user")
-            return
-        if password != confirm_password:
-            messagebox.showerror("Error", "Passwords don't match")
-            return
-
         try:
+            user_name = self.user_dropdown.currentText()
+            password = self.password.text().strip()
+            confirm_password = self.confirm_password.text().strip()
+
+            if not user_name:
+                QMessageBox.critical(self, "Error", "Please select a user")
+                return
+            if not password or password != confirm_password:
+                QMessageBox.critical(self, "Error", "Passwords don't match or are empty")
+                return
+
             cursor = self.controller.db.cursor()
             cursor.execute("""
                 UPDATE users 
@@ -594,119 +1249,148 @@ class AdminPanelPage(Frame):
                 WHERE name=%s
             """, (password, user_name))
             self.controller.db.commit()
-            messagebox.showinfo("Success", "Admin privileges granted")
+            cursor.close()
+            QMessageBox.information(self, "Success", "Admin privileges granted")
             self.refresh()
         except mysql.connector.Error as err:
-            messagebox.showerror("Error", f"Database error: {err}")
+            QMessageBox.critical(self, "Error", f"Database error: {err}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to grant admin access: {e}")
 
-class ReportPage(Frame):
-    def __init__(self, parent, controller):
-        super().__init__(parent, bg="#e6f3fa")
+class ReportPage(QWidget):
+    def __init__(self, controller):
+        super().__init__()
         self.controller = controller
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(50, 50, 50, 50)
+        layout.setSpacing(30)
 
-        frame = tk.Frame(self, bg="#ffffff", padx=20, pady=20, relief="groove", bd=2)
-        frame.pack(expand=True, fill='both', padx=10, pady=10)
+        # Header
+        header_layout = QHBoxLayout()
+        title = QLabel("Library Reports")
+        title.setFont(QFont("Helvetica, Arial, sans-serif", 32, QFont.Bold))
+        title.setStyleSheet("color: #1f2937; border: none;")
+        header_layout.addWidget(title)
+        header_layout.addStretch()
 
-        top_frame = tk.Frame(frame, bg="#ffffff")
-        top_frame.pack(fill='x', pady=10)
-        ttk.Button(top_frame, text="Refresh", command=self.refresh).pack(side='left')
-        ttk.Button(top_frame, text="Back", command=lambda: controller.show_frame("HomePage")).pack(side='right')
+        generate_btn = QPushButton("Generate")
+        generate_btn.setFixedWidth(180)
+        generate_btn.setMinimumHeight(50)
+        generate_btn.clicked.connect(self.generate_report)
+        header_layout.addWidget(generate_btn)
 
-        tk.Label(frame, text="Library Reports", font=('Helvetica', 16, 'bold'), bg="#ffffff", fg="#2c3e50").pack(pady=10)
-        self.report_type = tk.StringVar(value="all_books")
-        ttk.Radiobutton(frame, text="All Books", variable=self.report_type, value="all_books").pack(anchor='w', pady=2)
-        ttk.Radiobutton(frame, text="Currently Issued Books", variable=self.report_type, value="issued_books").pack(anchor='w', pady=2)
-        ttk.Radiobutton(frame, text="Transaction History", variable=self.report_type, value="transaction_history").pack(anchor='w', pady=2)
+        export_btn = QPushButton("Export to Excel")
+        export_btn.setFixedWidth(180)
+        export_btn.setMinimumHeight(50)
+        export_btn.clicked.connect(self.export_to_excel)
+        header_layout.addWidget(export_btn)
 
-        ttk.Button(frame, text="Generate Report", command=self.generate_report).pack(pady=10)
-        ttk.Button(frame, text="Export to Excel", command=self.export_to_excel).pack(pady=5)
-        ttk.Button(frame, text="Logout", command=self.logout).pack(pady=20)
+        layout.addLayout(header_layout)
 
-        self.report_text = tk.Text(frame, height=20, width=100, font=('Helvetica', 10))
-        self.report_text.pack(pady=10, padx=10)
-        scrollbar = tk.Scrollbar(frame, command=self.report_text.yview)
-        scrollbar.pack(side='right', fill='y')
-        self.report_text.config(yscrollcommand=scrollbar.set)
+        # Report options
+        options_frame = QFrame()
+        options_layout = QVBoxLayout(options_frame)
+        options_layout.setSpacing(15)
+        options_layout.setContentsMargins(30, 30, 30, 30)
+
+        self.all_books = QRadioButton("All Books")
+        self.all_books.setChecked(True)
+        options_layout.addWidget(self.all_books)
+
+        self.issued_books = QRadioButton("Currently Issued Books")
+        options_layout.addWidget(self.issued_books)
+
+        self.transaction_history = QRadioButton("Transaction History")
+        options_layout.addWidget(self.transaction_history)
+
+        layout.addWidget(options_frame)
+
+        # Report output
+        self.report_text = QTextEdit()
+        layout.addWidget(self.report_text)
+
+        self.refresh()
 
     def refresh(self):
-        self.report_text.delete(1.0, tk.END)
-        self.report_type.set("all_books")
+        self.report_text.clear()
+        self.all_books.setChecked(True)
 
     def generate_report(self):
-        cursor = self.controller.db.cursor(dictionary=True)
-        report_type = self.report_type.get()
+        try:
+            cursor = self.controller.db.cursor(dictionary=True)
+            if self.all_books.isChecked():
+                report_type = "all_books"
+            elif self.issued_books.isChecked():
+                report_type = "issued_books"
+            else:
+                report_type = "transaction_history"
 
-        if report_type == "all_books":
-            query = """
-                SELECT b.serial_number, b.title, a.name as author, 
-                       u.name as user, t.issue_date, t.return_date
-                FROM books b
-                LEFT JOIN authors a ON b.author_id = a.id
-                LEFT JOIN transactions t ON b.id = t.book_id
-                LEFT JOIN users u ON t.user_id = u.id
-                ORDER BY b.title
-            """
-        elif report_type == "issued_books":
-            query = """
-                SELECT b.serial_number, b.title, a.name as author, 
-                       u.name as user, t.issue_date
-                FROM books b
-                JOIN authors a ON b.author_id = a.id
-                JOIN transactions t ON b.id = t.book_id
-                JOIN users u ON t.user_id = u.id
-                WHERE t.return_date IS NULL
-                ORDER BY t.issue_date
-            """
-        else:
-            query = """
-                SELECT b.serial_number, b.title, a.name as author, 
-                       u.name as user, t.issue_date, t.return_date
-                FROM books b
-                JOIN authors a ON b.author_id = a.id
-                JOIN transactions t ON b.id = t.book_id
-                JOIN users u ON t.user_id = u.id
-                ORDER BY t.issue_date DESC
-            """
+            if report_type == "all_books":
+                query = """
+                    SELECT b.serial_number, b.title, a.name as author, 
+                           u.name as user, t.issue_date, t.return_date
+                    FROM books b
+                    LEFT JOIN authors a ON b.author_id = a.id
+                    LEFT JOIN transactions t ON b.id = t.book_id
+                    LEFT JOIN users u ON t.user_id = u.id
+                    ORDER BY b.title
+                """
+            elif report_type == "issued_books":
+                query = """
+                    SELECT b.serial_number, b.title, a.name as author, 
+                           u.name as user, t.issue_date
+                    FROM books b
+                    JOIN authors a ON b.author_id = a.id
+                    JOIN transactions t ON b.id = t.book_id
+                    JOIN users u ON t.user_id = u.id
+                    WHERE t.return_date IS NULL
+                    ORDER BY t.issue_date
+                """
+            else:
+                query = """
+                    SELECT b.serial_number, b.title, a.name as author, 
+                           u.name as user, t.issue_date, t.return_date
+                    FROM books b
+                    JOIN authors a ON b.author_id = a.id
+                    JOIN transactions t ON b.id = t.book_id
+                    JOIN users u ON t.user_id = u.id
+                    ORDER BY t.issue_date DESC
+                """
 
-        cursor.execute(query)
-        results = cursor.fetchall()
+            cursor.execute(query)
+            results = cursor.fetchall()
+            cursor.close()
 
-        if not results:
-            self.report_text.delete(1.0, tk.END)
-            self.report_text.insert(tk.END, "No data found for the selected report type.")
-            return
+            if not results:
+                self.report_text.setText("No data found for the selected report type.")
+                return
 
-        self.report_df = pd.DataFrame(results)
-        self.report_text.delete(1.0, tk.END)
-        self.report_text.insert(tk.END, self.report_df.to_string(index=False))
+            self.report_df = pd.DataFrame(results)
+            self.report_text.setText(self.report_df.to_string(index=False))
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to generate report: {e}")
 
     def export_to_excel(self):
-        if not hasattr(self, 'report_df') or self.report_df.empty:
-            messagebox.showwarning("Warning", "No report data to export. Generate a report first.")
-            return
+        try:
+            if not hasattr(self, 'report_df') or self.report_df.empty:
+                QMessageBox.warning(self, "Warning", "No report data to export. Generate a report first.")
+                return
 
-        file_path = filedialog.asksaveasfilename(
-            defaultextension=".xlsx",
-            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
-            title="Save report as"
-        )
-
-        if file_path:
-            # Ensure the file has .xlsx extension
-            if not file_path.endswith('.xlsx'):
-                file_path += '.xlsx'
-            try:
+            file_path = QFileDialog.getSaveFileName(self, "Save report as", "", "Excel files (*.xlsx);;All files (*.*)")[0]
+            if file_path:
+                if not file_path.endswith('.xlsx'):
+                    file_path += '.xlsx'
                 self.report_df.to_excel(file_path, index=False, engine='openpyxl')
-                messagebox.showinfo("Success", f"Report successfully exported to {file_path}")
-            except ImportError:
-                messagebox.showerror("Error", "Excel export engine 'openpyxl' not installed. Please install it using 'pip install openpyxl'.")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to export report: {str(e)}")
-
-    def logout(self):
-        self.controller.show_frame("LoginPage")
+                QMessageBox.information(self, "Success", f"Report successfully exported to {file_path}")
+        except ImportError:
+            QMessageBox.critical(self, "Error",
+                                 "Excel export engine 'openpyxl' not installed. Please install it using 'pip install openpyxl'.")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to export report: {e}")
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = LibraryManagementSystem(root)
-    root.mainloop()
+    app = QApplication(sys.argv)
+    app.setStyle('Fusion')
+    window = LibraryManagementSystem()
+    window.show()
+    sys.exit(app.exec_())
