@@ -9,9 +9,9 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QPushButton, QLabel, QLineEdit, QComboBox, QTableWidget,
                              QTableWidgetItem, QHeaderView, QFrame, QTextEdit,
                              QRadioButton, QFileDialog, QMessageBox, QDateEdit, QStackedWidget,
-                             QScrollArea, QCompleter)
+                             QScrollArea, QDialog)
 from PyQt5.QtGui import QPixmap, QFont, QImage, QIcon
-from PyQt5.QtCore import Qt, QDate, QSize, QStringListModel
+from PyQt5.QtCore import Qt, QDate, QSize
 
 class LibraryManagementSystem(QMainWindow):
     def __init__(self):
@@ -23,9 +23,9 @@ class LibraryManagementSystem(QMainWindow):
         app = QApplication.instance()
         app.setFont(QFont("Helvetica, Arial, sans-serif", 15))
 
-        # Updated stylesheet
+        # Updated stylesheet with explicit button styling for dialogs
         self.setStyleSheet("""
-            QMainWindow {
+            QMainWindow, QDialog {
                 background-color: #f0f2f5;
             }
             QFrame {
@@ -41,6 +41,15 @@ class LibraryManagementSystem(QMainWindow):
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 #6366f1, stop:1 #4f46e5);
                 color: white;
+                border-radius: 5px;
+                padding: 12px;
+                font-size: 16pt;
+                border: none;
+            }
+            QDialog QPushButton, QFrame QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #6366f1, stop:1 #4f46e5) !important;
+                color: white !important;
                 border-radius: 5px;
                 padding: 12px;
                 font-size: 16pt;
@@ -73,7 +82,7 @@ class LibraryManagementSystem(QMainWindow):
             QComboBox QAbstractItemView {
                 background-color: #ffffff;
                 color: #1f2937;
-                selection-background-color: #6366f1;
+                selection-background-color: green;
                 selection-color: white;
                 border: 1px solid #d1d5db;
                 padding: 5px;
@@ -509,7 +518,7 @@ class CreateUserPage(QWidget):
             QMessageBox.critical(self, "Error", f"Failed to navigate: {e}")
 
     def show_create_form(self):
-        dialog = QWidget()
+        dialog = QDialog(self.controller)
         dialog.setWindowTitle("Create User")
         dialog.setFixedSize(500, 500)
         dialog.setStyleSheet("background-color: #f0f2f5;")
@@ -547,7 +556,7 @@ class CreateUserPage(QWidget):
         frame_layout.addWidget(submit_btn)
 
         layout.addWidget(frame)
-        dialog.show()
+        dialog.exec_()
 
     def submit_user(self, name, serial, dob, dialog):
         try:
@@ -564,7 +573,7 @@ class CreateUserPage(QWidget):
             cursor.close()
             QMessageBox.information(self, "Success", "User created successfully")
             self.refresh()
-            dialog.close()
+            dialog.accept()
         except mysql.connector.Error as err:
             QMessageBox.critical(self, "Error", f"Database error: {err}")
 
@@ -704,7 +713,7 @@ class BookAuthorPage(QWidget):
             QMessageBox.critical(self, "Error", f"Failed to navigate: {e}")
 
     def show_view_authors(self):
-        dialog = QWidget()
+        dialog = QDialog(self.controller)
         dialog.setWindowTitle("View Authors")
         dialog.setFixedSize(600, 600)
         dialog.setStyleSheet("background-color: #f0f2f5;")
@@ -731,16 +740,44 @@ class BookAuthorPage(QWidget):
         # Pagination
         pagination_frame = QFrame()
         pagination_layout = QHBoxLayout(pagination_frame)
+
+        # Green Button Style
+        green_button_style = """
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                font: 12pt "Helvetica";
+                border-radius: 5px;
+                padding: 10px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """
+
+        # Previous Button
         prev_btn = QPushButton("Previous")
         prev_btn.setMinimumHeight(50)
+        prev_btn.setStyleSheet(green_button_style)
         prev_btn.clicked.connect(lambda: self.prev_author_page(dialog))
         pagination_layout.addWidget(prev_btn)
 
+        # Spacer before label
+        pagination_layout.addStretch(1)
+
+        # Center Page Label
         self.author_page_label = QLabel("Page 1")
+        self.author_page_label.setStyleSheet("font: 12pt 'Helvetica'; color: #2c3e50;")
+        self.author_page_label.setAlignment(Qt.AlignCenter)
         pagination_layout.addWidget(self.author_page_label)
 
+        # Spacer after label
+        pagination_layout.addStretch(1)
+
+        # Next Button
         next_btn = QPushButton("Next")
         next_btn.setMinimumHeight(50)
+        next_btn.setStyleSheet(green_button_style)
         next_btn.clicked.connect(lambda: self.next_author_page(dialog))
         pagination_layout.addWidget(next_btn)
 
@@ -750,7 +787,7 @@ class BookAuthorPage(QWidget):
         self.current_author_page = 1
         self.authors_per_page = 10
         self.load_authors(dialog)
-        dialog.show()
+        dialog.exec_()
 
     def load_authors(self, dialog):
         try:
@@ -790,7 +827,7 @@ class BookAuthorPage(QWidget):
             QMessageBox.critical(self, "Error", f"Failed to navigate: {e}")
 
     def show_add_author_form(self):
-        dialog = QWidget()
+        dialog = QDialog(self.controller)
         dialog.setWindowTitle("Add Author")
         dialog.setFixedSize(500, 550)
         dialog.setStyleSheet("background-color: #f0f2f5;")
@@ -818,14 +855,25 @@ class BookAuthorPage(QWidget):
 
         add_author_btn = QPushButton("Add Author")
         add_author_btn.setMinimumHeight(50)
+        add_author_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;  
+                color: white;
+                font: 14pt "Helvetica";
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
         add_author_btn.clicked.connect(lambda: self.add_author(dialog))
         frame_layout.addWidget(add_author_btn)
 
         layout.addWidget(frame)
-        dialog.show()
+        dialog.exec_()
 
     def show_add_book_form(self):
-        dialog = QWidget()
+        dialog = QDialog(self.controller)
         dialog.setWindowTitle("Add Book")
         dialog.setFixedSize(500, 500)
         dialog.setStyleSheet("background-color: #f0f2f5;")
@@ -843,26 +891,57 @@ class BookAuthorPage(QWidget):
 
         self.author_dropdown = QComboBox()
         self.author_dropdown.setMinimumHeight(50)
+        self.author_dropdown.setStyleSheet("""
+            QComboBox {
+                color: #000000;
+                font: 14pt "Helvetica";
+                padding: 6px;
+            }
+            QComboBox QAbstractItemView {
+                font: 14pt "Helvetica";
+                color: #000000;
+                background-color: #ffffff;
+                selection-background-color: #c8f7c5;
+            }
+        """)
         self.refresh_authors()
         frame_layout.addWidget(self.author_dropdown)
 
+        # Book Title Input
         self.book_title = QLineEdit()
         self.book_title.setPlaceholderText("Book Title")
         self.book_title.setMinimumHeight(50)
         frame_layout.addWidget(self.book_title)
 
+        # Book Serial Input
         self.book_serial = QLineEdit()
         self.book_serial.setPlaceholderText("Book Serial")
         self.book_serial.setMinimumHeight(50)
         frame_layout.addWidget(self.book_serial)
 
+        # Green Button Style
+        green_button_style = """
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                font: 12pt "Helvetica";
+                border-radius: 5px;
+                padding: 10px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """
+
+        # Add Book Button
         add_book_btn = QPushButton("Add Book")
         add_book_btn.setMinimumHeight(50)
+        add_book_btn.setStyleSheet(green_button_style)
         add_book_btn.clicked.connect(lambda: self.add_book(dialog))
         frame_layout.addWidget(add_book_btn)
 
         layout.addWidget(frame)
-        dialog.show()
+        dialog.exec_()
 
     def refresh_authors(self):
         try:
@@ -892,7 +971,7 @@ class BookAuthorPage(QWidget):
             self.author_name.clear()
             self.author_details.clear()
             self.refresh_authors()
-            dialog.close()
+            dialog.accept()
             self.refresh()
         except mysql.connector.Error as err:
             QMessageBox.critical(self, "Error", f"Database error: {err}")
@@ -926,7 +1005,7 @@ class BookAuthorPage(QWidget):
             self.book_title.clear()
             self.book_serial.clear()
             self.author_dropdown.setCurrentIndex(-1)
-            dialog.close()
+            dialog.accept()
             self.refresh()
         except mysql.connector.Error as err:
             QMessageBox.critical(self, "Error", f"Database error: {err}")
@@ -960,15 +1039,32 @@ class AssignReturnPage(QWidget):
         assign_title.setStyleSheet("color: #1f2937; border: none;")
         assign_layout.addWidget(assign_title)
 
-        self.user_input = QLineEdit()
-        self.user_input.setPlaceholderText("Type to select user...")
-        self.user_input.setMinimumHeight(50)
-        assign_layout.addWidget(self.user_input)
+        combo_style = """
+            QComboBox {
+                color: #000000;
+                font: bold 14pt "Helvetica";
+                padding: 6px;
+            }
+            QComboBox QAbstractItemView {
+                font: bold 14pt "Helvetica";
+                color: #000000;
+                background-color: #f0f0f0;
+                selection-background-color: #a5d6a7;  /* Soft green instead of white */
+                selection-color: #000000;
+            }
+        """
 
-        self.book_input = QLineEdit()
-        self.book_input.setPlaceholderText("Type to select book...")
-        self.book_input.setMinimumHeight(50)
-        assign_layout.addWidget(self.book_input)
+        self.user_dropdown = QComboBox()
+        self.user_dropdown.setMinimumHeight(50)
+        self.user_dropdown.setStyleSheet(combo_style)
+        self.user_dropdown.setPlaceholderText("Select user...")
+        assign_layout.addWidget(self.user_dropdown)
+
+        self.book_dropdown = QComboBox()
+        self.book_dropdown.setMinimumHeight(50)
+        self.book_dropdown.setStyleSheet(combo_style)
+        self.book_dropdown.setPlaceholderText("Select book...")
+        assign_layout.addWidget(self.book_dropdown)
 
         self.issue_date = QDateEdit()
         self.issue_date.setCalendarPopup(True)
@@ -994,16 +1090,18 @@ class AssignReturnPage(QWidget):
         return_title.setStyleSheet("color: #1f2937; border: none;")
         return_layout.addWidget(return_title)
 
-        self.return_user_input = QLineEdit()
-        self.return_user_input.setPlaceholderText("Type to select user...")
-        self.return_user_input.setMinimumHeight(50)
-        self.return_user_input.textChanged.connect(self.update_return_books)
-        return_layout.addWidget(self.return_user_input)
+        self.return_user_dropdown = QComboBox()
+        self.return_user_dropdown.setMinimumHeight(50)
+        self.return_user_dropdown.setStyleSheet(combo_style)
+        self.return_user_dropdown.setPlaceholderText("Select user...")
+        self.return_user_dropdown.currentTextChanged.connect(self.update_return_books)
+        return_layout.addWidget(self.return_user_dropdown)
 
-        self.return_book_input = QLineEdit()
-        self.return_book_input.setPlaceholderText("Type to select book...")
-        self.return_book_input.setMinimumHeight(50)
-        return_layout.addWidget(self.return_book_input)
+        self.return_book_dropdown = QComboBox()
+        self.return_book_dropdown.setMinimumHeight(50)
+        self.return_book_dropdown.setStyleSheet(combo_style)
+        self.return_book_dropdown.setPlaceholderText("Select book...")
+        return_layout.addWidget(self.return_book_dropdown)
 
         self.return_date = QDateEdit()
         self.return_date.setCalendarPopup(True)
@@ -1023,44 +1121,59 @@ class AssignReturnPage(QWidget):
         self.refresh()
 
     def refresh(self):
-        self.setup_completers()
+        self.populate_dropdowns()
         self.update_return_books()
-        self.user_input.clear()
-        self.book_input.clear()
-        self.return_user_input.clear()
-        self.return_book_input.clear()
+        self.user_dropdown.setCurrentIndex(-1)
+        self.book_dropdown.setCurrentIndex(-1)
+        self.return_user_dropdown.setCurrentIndex(-1)
+        self.return_book_dropdown.setCurrentIndex(-1)
         self.issue_date.setDate(QDate.currentDate())
         self.return_date.setDate(QDate.currentDate())
 
-    def setup_completers(self):
+    def populate_dropdowns(self):
         try:
             cursor = self.controller.db.cursor()
+            # Load users
             cursor.execute("SELECT name FROM users")
             users = [row[0] for row in cursor.fetchall()]
+            # Load books
             cursor.execute("SELECT title FROM books")
             books = [row[0] for row in cursor.fetchall()]
             cursor.close()
 
-            user_model = QStringListModel(users)
-            book_model = QStringListModel(books)
+            # Debug: Verify data
+            print(f"Users loaded: {users}")
+            print(f"Books loaded: {books}")
 
-            user_completer = QCompleter(user_model, self)
-            user_completer.setCaseSensitivity(Qt.CaseInsensitive)
-            self.user_input.setCompleter(user_completer)
-            self.return_user_input.setCompleter(user_completer)
+            # Populate dropdowns
+            self.user_dropdown.clear()
+            self.return_user_dropdown.clear()
+            self.book_dropdown.clear()
+            if users:
+                self.user_dropdown.addItems(users)
+                self.return_user_dropdown.addItems(users)
+            else:
+                self.user_dropdown.addItem("No users found")
+                self.return_user_dropdown.addItem("No users found")
+                QMessageBox.warning(self, "Warning", "No users found in the database.")
 
-            book_completer = QCompleter(book_model, self)
-            book_completer.setCaseSensitivity(Qt.CaseInsensitive)
-            self.book_input.setCompleter(book_completer)
+            if books:
+                self.book_dropdown.addItems(books)
+            else:
+                self.book_dropdown.addItem("No books found")
+                QMessageBox.warning(self, "Warning", "No books found in the database.")
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to setup completers: {e}")
+            print(f"Dropdown population error: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to populate dropdowns: {e}")
 
     def update_return_books(self):
         try:
-            user_name = self.return_user_input.text().strip()
-            if not user_name:
-                self.return_book_input.clear()
-                self.return_book_input.setCompleter(None)
+            user_name = self.return_user_dropdown.currentText().strip()
+            print(f"Updating return books for user: {user_name}")
+            self.return_book_dropdown.clear()
+
+            if not user_name or user_name == "No users found":
+                self.return_book_dropdown.addItem("No books available")
                 return
 
             cursor = self.controller.db.cursor()
@@ -1074,21 +1187,26 @@ class AssignReturnPage(QWidget):
             books = [row[0] for row in cursor.fetchall()]
             cursor.close()
 
-            book_model = QStringListModel(books)
-            book_completer = QCompleter(book_model, self)
-            book_completer.setCaseSensitivity(Qt.CaseInsensitive)
-            self.return_book_input.setCompleter(book_completer)
+            # Debug: Verify books for return
+            print(f"Books for user '{user_name}': {books}")
+
+            if books:
+                self.return_book_dropdown.addItems(books)
+            else:
+                self.return_book_dropdown.addItem("No issued books")
+                QMessageBox.warning(self, "Warning", f"No issued books found for user '{user_name}'.")
         except Exception as e:
+            print(f"Update return books error: {e}")
             QMessageBox.critical(self, "Error", f"Failed to refresh return books: {e}")
 
     def assign_book(self):
         try:
-            user_name = self.user_input.text().strip()
-            book_title = self.book_input.text().strip()
+            user_name = self.user_dropdown.currentText().strip()
+            book_title = self.book_dropdown.currentText().strip()
             issue_date = self.issue_date.date().toPyDate()
 
-            if not user_name or not book_title:
-                QMessageBox.critical(self, "Error", "Please select both user and book")
+            if not user_name or not book_title or user_name == "No users found" or book_title == "No books found":
+                QMessageBox.critical(self, "Error", "Please select both a valid user and book")
                 return
 
             cursor = self.controller.db.cursor()
@@ -1123,12 +1241,12 @@ class AssignReturnPage(QWidget):
 
     def return_book(self):
         try:
-            user_name = self.return_user_input.text().strip()
-            book_title = self.return_book_input.text().strip()
+            user_name = self.return_user_dropdown.currentText().strip()
+            book_title = self.return_book_dropdown.currentText().strip()
             return_date = self.return_date.date().toPyDate()
 
-            if not user_name or not book_title:
-                QMessageBox.critical(self, "Error", "Please select both user and book")
+            if not user_name or not book_title or user_name == "No users found" or book_title in ["No issued books", "No books available"]:
+                QMessageBox.critical(self, "Error", "Please select both a valid user and book")
                 return
 
             cursor = self.controller.db.cursor()
@@ -1186,8 +1304,24 @@ class AdminPanelPage(QWidget):
         frame_layout.setSpacing(20)
         frame_layout.setContentsMargins(30, 30, 30, 30)
 
+        combo_style = """
+                    QComboBox {
+                        color: #000000;
+                        font: bold 14pt "Helvetica";
+                        padding: 6px;
+                    }
+                    QComboBox QAbstractItemView {
+                        font: bold 14pt "Helvetica";
+                        color: #000000;
+                        background-color: #f0f0f0;
+                        selection-background-color: #a5d6a7;  /* Soft green instead of white */
+                        selection-color: #000000;
+                    }
+                """
         self.user_dropdown = QComboBox()
         self.user_dropdown.setMinimumHeight(50)
+        self.user_dropdown.setStyleSheet(combo_style)
+        self.user_dropdown.setPlaceholderText("Select Member...")
         frame_layout.addWidget(self.user_dropdown)
 
         self.password = QLineEdit()
