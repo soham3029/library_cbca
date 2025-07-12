@@ -23,7 +23,7 @@ class LibraryManagementSystem(QMainWindow):
         app = QApplication.instance()
         app.setFont(QFont("Helvetica, Arial, sans-serif", 15))
 
-        # Updated stylesheet with explicit button styling for dialogs
+        # Updated stylesheet with enhanced button styling for dialogs
         self.setStyleSheet("""
             QMainWindow, QDialog {
                 background-color: #f0f2f5;
@@ -71,6 +71,24 @@ class LibraryManagementSystem(QMainWindow):
             QPushButton#refreshButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 #66bb6a, stop:1 #4CAF50);
+            }
+            QPushButton#updateButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #ff9800, stop:1 #f57c00); /* Updated to orange gradient */
+                color: white;
+                border-radius: 8px; /* Slightly larger radius for a softer look */
+                padding: 10px 20px; /* Adjusted padding for better proportion */
+                font-size: 15pt;
+                min-width: 120px;
+                border: 1px solid #f57c00;
+                transition: all 0.3s ease;
+            }
+            QPushButton#updateButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #ffb74d, stop:1 #ff9800); /* Lighter orange on hover */
+                border-color: #ffb74d;
+                transform: translateY(-2px); /* Slight lift effect */
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
             }
             QLineEdit, QComboBox, QDateEdit {
                 border: 1px solid #d1d5db;
@@ -529,19 +547,7 @@ class CreateUserPage(QWidget):
                 for col_idx, value in enumerate(user):
                     self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(value) if value else ''))
                 update_btn = QPushButton("Update")
-                update_btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: #4CAF50;
-                        color: white;
-                        border-radius: 5px;
-                        padding: 8px;
-                        font-size: 14pt;
-                        min-width: 100px;
-                    }
-                    QPushButton:hover {
-                        background-color: #45a049;
-                    }
-                """)
+                update_btn.setObjectName("updateButton")
                 update_btn.clicked.connect(lambda _, r=row_idx: self.show_update_user_form(r, 0))
                 self.table.setCellWidget(row_idx, 4, update_btn)
 
@@ -685,19 +691,8 @@ class CreateUserPage(QWidget):
             address.setMinimumHeight(120)
             frame_layout.addWidget(address)
 
-            update_btn = QPushButton("Update User")
-            update_btn.setMinimumHeight(50)
-            update_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #2196F3;
-                    color: white;
-                    font: 14pt "Helvetica";
-                    border-radius: 5px;
-                }
-                QPushButton:hover {
-                    background-color: #1976D2;
-                }
-            """)
+            update_btn = QPushButton("Update")
+            update_btn.setObjectName("updateButton")
             update_btn.clicked.connect(lambda: self.update_user(user[1], name.text(), serial.text(), phone.text(), address.toPlainText(), dialog))
             frame_layout.addWidget(update_btn)
 
@@ -880,18 +875,7 @@ class BookAuthorPage(QWidget):
                     self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(value) if value else ''))
                 # Add Update button
                 update_btn = QPushButton("Update")
-                update_btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: #2196F3;
-                        color: white;
-                        border-radius: 5px;
-                        padding: 8px;
-                        font-size: 14pt;
-                    }
-                    QPushButton:hover {
-                        background-color: #1976D2;
-                    }
-                """)
+                update_btn.setObjectName("updateButton")
                 update_btn.clicked.connect(lambda _, r=row_idx: self.show_update_book_form(r, 0))
                 self.table.setCellWidget(row_idx, 6, update_btn)
 
@@ -1244,19 +1228,8 @@ class BookAuthorPage(QWidget):
             occupied_by_label.setStyleSheet("color: #1f2937; font-size: 14pt; border: none;")
             frame_layout.addWidget(occupied_by_label)
 
-            update_btn = QPushButton("Update Book")
-            update_btn.setMinimumHeight(50)
-            update_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #2196F3;
-                    color: white;
-                    font: 14pt "Helvetica";
-                    border-radius: 5px;
-                }
-                QPushButton:hover {
-                    background-color: #1976D2;
-                }
-            """)
+            update_btn = QPushButton("Update")
+            update_btn.setObjectName("updateButton")
             update_btn.clicked.connect(lambda: self.update_book(book[1], book_title.text(), book_serial.text(), book_location.text(), book[4], dialog))
             frame_layout.addWidget(update_btn)
 
