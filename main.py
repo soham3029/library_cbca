@@ -59,6 +59,19 @@ class LibraryManagementSystem(QMainWindow):
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 #818cf8, stop:1 #6366f1);
             }
+            QPushButton#refreshButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #4CAF50, stop:1 #45a049);
+                color: white;
+                border-radius: 5px;
+                padding: 12px;
+                font-size: 16pt;
+                border: none;
+            }
+            QPushButton#refreshButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #66bb6a, stop:1 #4CAF50);
+            }
             QLineEdit, QComboBox, QDateEdit {
                 border: 1px solid #d1d5db;
                 border-radius: 5px;
@@ -224,26 +237,28 @@ class LibraryManagementSystem(QMainWindow):
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                serial_number VARCHAR(255) UNIQUE NOT NULL,
-                dob DATE,
-                password VARCHAR(255) NOT NULL,
+                name VARCHAR(255),
+                serial_number VARCHAR(255) UNIQUE,
+                phone_number VARCHAR(20),
+                address TEXT,
+                password VARCHAR(255),
                 is_admin BOOLEAN DEFAULT FALSE
             )
         """)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS authors (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) UNIQUE NOT NULL,
+                name VARCHAR(255) UNIQUE,
                 details TEXT
             )
         """)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS books (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                serial_number VARCHAR(255) UNIQUE NOT NULL,
-                title VARCHAR(255) NOT NULL,
+                serial_number VARCHAR(255) UNIQUE,
+                title VARCHAR(255),
                 author_id INT,
+                location TEXT,
                 FOREIGN KEY (author_id) REFERENCES authors(id)
             )
         """)
@@ -358,12 +373,22 @@ class HomePage(QWidget):
         layout.setContentsMargins(50, 50, 50, 50)
         layout.setSpacing(30)
 
-        # Title
+        # Header with Refresh Button
+        header_layout = QHBoxLayout()
         title = QLabel("Library Dashboard")
         title.setFont(QFont("Helvetica, Arial, sans-serif", 32, QFont.Bold))
         title.setStyleSheet("color: #1f2937; border: none;")
-        title.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title)
+        header_layout.addWidget(title)
+        header_layout.addStretch()
+
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.setObjectName("refreshButton")
+        refresh_btn.setFixedWidth(180)
+        refresh_btn.setMinimumHeight(50)
+        refresh_btn.clicked.connect(self.refresh)
+        header_layout.addWidget(refresh_btn)
+
+        layout.addLayout(header_layout)
 
         # Cards
         cards_layout = QHBoxLayout()
@@ -402,7 +427,7 @@ class HomePage(QWidget):
         layout.addStretch()
 
     def refresh(self):
-        pass
+        pass  # No data to refresh on HomePage, but included for consistency
 
 class CreateUserPage(QWidget):
     def __init__(self, controller):
@@ -428,6 +453,13 @@ class CreateUserPage(QWidget):
         create_btn.clicked.connect(self.show_create_form)
         header_layout.addWidget(create_btn)
 
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.setObjectName("refreshButton")
+        refresh_btn.setFixedWidth(180)
+        refresh_btn.setMinimumHeight(50)
+        refresh_btn.clicked.connect(self.refresh)
+        header_layout.addWidget(refresh_btn)
+
         layout.addLayout(header_layout)
 
         # Search bar
@@ -439,10 +471,12 @@ class CreateUserPage(QWidget):
 
         # Users table
         self.table = QTableWidget()
-        self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(['Full Name', 'Serial Number', 'Date of Birth'])
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(['Full Name', 'Serial Number', 'Phone Number', 'Address', 'Actions'])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setAlternatingRowColors(True)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.cellDoubleClicked.connect(self.show_update_user_form)
         layout.addWidget(self.table)
 
         # Pagination
@@ -453,7 +487,7 @@ class CreateUserPage(QWidget):
         prev_btn.clicked.connect(self.prev_page)
         pagination_layout.addWidget(prev_btn)
 
-        self.page_label = QLabel("Page 1")
+        self.page_label = QLabel("Page 1 of 1")
         pagination_layout.addWidget(self.page_label)
 
         next_btn = QPushButton("Next")
@@ -466,13 +500,15 @@ class CreateUserPage(QWidget):
         self.refresh()
 
     def refresh(self):
+        self.current_page = 1
+        self.search_input.clear()
         self.load_users()
 
     def load_users(self, search_term=""):
         try:
             self.table.setRowCount(0)
             cursor = self.controller.db.cursor()
-            query = "SELECT name, serial_number, dob FROM users"
+            query = "SELECT name, serial_number, phone_number, address FROM users"
             params = ()
             if search_term:
                 query += " WHERE name LIKE %s OR serial_number LIKE %s"
@@ -480,19 +516,37 @@ class CreateUserPage(QWidget):
 
             cursor.execute(query, params)
             users = cursor.fetchall()
-            cursor.close()
+
+            # Calculate total pages
+            total_users = len(users)
+            total_pages = max(1, (total_users + self.users_per_page - 1) // self.users_per_page)
 
             start = (self.current_page - 1) * self.users_per_page
             end = start + self.users_per_page
             self.table.setRowCount(min(self.users_per_page, len(users[start:end])))
 
             for row_idx, user in enumerate(users[start:end]):
-                self.table.setItem(row_idx, 0, QTableWidgetItem(user[0]))
-                self.table.setItem(row_idx, 1, QTableWidgetItem(user[1]))
-                dob = user[2].strftime('%Y-%m-%d') if user[2] else ''
-                self.table.setItem(row_idx, 2, QTableWidgetItem(dob))
+                for col_idx, value in enumerate(user):
+                    self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(value) if value else ''))
+                update_btn = QPushButton("Update")
+                update_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #4CAF50;
+                        color: white;
+                        border-radius: 5px;
+                        padding: 8px;
+                        font-size: 14pt;
+                        min-width: 100px;
+                    }
+                    QPushButton:hover {
+                        background-color: #45a049;
+                    }
+                """)
+                update_btn.clicked.connect(lambda _, r=row_idx: self.show_update_user_form(r, 0))
+                self.table.setCellWidget(row_idx, 4, update_btn)
 
-            self.page_label.setText(f"Page {self.current_page}")
+            self.page_label.setText(f"Page {self.current_page} of {total_pages}")
+            cursor.close()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load users: {e}")
 
@@ -508,10 +562,16 @@ class CreateUserPage(QWidget):
     def next_page(self):
         try:
             cursor = self.controller.db.cursor()
-            cursor.execute("SELECT COUNT(*) FROM users")
+            query = "SELECT COUNT(*) FROM users"
+            if self.search_input.text():
+                query += " WHERE name LIKE %s OR serial_number LIKE %s"
+                cursor.execute(query, (f"%{self.search_input.text()}%", f"%{self.search_input.text()}%"))
+            else:
+                cursor.execute(query)
             total_users = cursor.fetchone()[0]
             cursor.close()
-            if self.current_page * self.users_per_page < total_users:
+            total_pages = max(1, (total_users + self.users_per_page - 1) // self.users_per_page)
+            if self.current_page < total_pages:
                 self.current_page += 1
                 self.load_users(self.search_input.text())
         except Exception as e:
@@ -520,7 +580,7 @@ class CreateUserPage(QWidget):
     def show_create_form(self):
         dialog = QDialog(self.controller)
         dialog.setWindowTitle("Create User")
-        dialog.setFixedSize(500, 500)
+        dialog.setFixedSize(500, 600)
         dialog.setStyleSheet("background-color: #f0f2f5;")
 
         layout = QVBoxLayout(dialog)
@@ -544,34 +604,155 @@ class CreateUserPage(QWidget):
         serial.setMinimumHeight(50)
         frame_layout.addWidget(serial)
 
-        dob = QDateEdit()
-        dob.setCalendarPopup(True)
-        dob.setDisplayFormat("yyyy-MM-dd")
-        dob.setMinimumHeight(50)
-        frame_layout.addWidget(dob)
+        phone = QLineEdit()
+        phone.setPlaceholderText("Phone Number")
+        phone.setMinimumHeight(50)
+        frame_layout.addWidget(phone)
+
+        address = QTextEdit()
+        address.setPlaceholderText("Address")
+        address.setMinimumHeight(120)
+        frame_layout.addWidget(address)
 
         submit_btn = QPushButton("Create User")
         submit_btn.setMinimumHeight(50)
-        submit_btn.clicked.connect(lambda: self.submit_user(name.text(), serial.text(), dob.date().toPyDate(), dialog))
+        submit_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                font: 14pt "Helvetica";
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        submit_btn.clicked.connect(lambda: self.submit_user(name.text(), serial.text(), phone.text(), address.toPlainText(), dialog))
         frame_layout.addWidget(submit_btn)
 
         layout.addWidget(frame)
         dialog.exec_()
 
-    def submit_user(self, name, serial, dob, dialog):
+    def show_update_user_form(self, row, col):
+        try:
+            serial_number = self.table.item(row, 1).text() if self.table.item(row, 1) else ""
+            if not serial_number:
+                QMessageBox.critical(self, "Error", "No serial number found for this user")
+                return
+
+            cursor = self.controller.db.cursor()
+            cursor.execute("SELECT name, serial_number, phone_number, address FROM users WHERE serial_number=%s", (serial_number,))
+            user = cursor.fetchone()
+            cursor.close()
+
+            if not user:
+                QMessageBox.critical(self, "Error", "User not found")
+                return
+
+            dialog = QDialog(self.controller)
+            dialog.setWindowTitle("Update User")
+            dialog.setFixedSize(500, 600)
+            dialog.setStyleSheet("background-color: #f0f2f5;")
+
+            layout = QVBoxLayout(dialog)
+            frame = QFrame()
+            frame_layout = QVBoxLayout(frame)
+            frame_layout.setSpacing(20)
+            frame_layout.setContentsMargins(30, 30, 30, 30)
+
+            title = QLabel("Update User")
+            title.setFont(QFont("Helvetica, Arial, sans-serif", 24, QFont.Bold))
+            title.setStyleSheet("color: #1f2937; border: none;")
+            frame_layout.addWidget(title)
+
+            name = QLineEdit(user[0] or "")
+            name.setPlaceholderText("Full Name")
+            name.setMinimumHeight(50)
+            frame_layout.addWidget(name)
+
+            serial = QLineEdit(user[1] or "")
+            serial.setPlaceholderText("Serial Number")
+            serial.setMinimumHeight(50)
+            frame_layout.addWidget(serial)
+
+            phone = QLineEdit(user[2] or "")
+            phone.setPlaceholderText("Phone Number")
+            phone.setMinimumHeight(50)
+            frame_layout.addWidget(phone)
+
+            address = QTextEdit(user[3] or "")
+            address.setPlaceholderText("Address")
+            address.setMinimumHeight(120)
+            frame_layout.addWidget(address)
+
+            update_btn = QPushButton("Update User")
+            update_btn.setMinimumHeight(50)
+            update_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #2196F3;
+                    color: white;
+                    font: 14pt "Helvetica";
+                    border-radius: 5px;
+                }
+                QPushButton:hover {
+                    background-color: #1976D2;
+                }
+            """)
+            update_btn.clicked.connect(lambda: self.update_user(user[1], name.text(), serial.text(), phone.text(), address.toPlainText(), dialog))
+            frame_layout.addWidget(update_btn)
+
+            layout.addWidget(frame)
+            dialog.exec_()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load user data: {e}")
+
+    def submit_user(self, name, serial, phone, address, dialog):
         try:
             if not name or not serial:
                 QMessageBox.critical(self, "Error", "Name and serial number are required")
                 return
 
             cursor = self.controller.db.cursor()
+            cursor.execute("SELECT id FROM users WHERE serial_number=%s", (serial,))
+            if cursor.fetchone():
+                cursor.close()
+                QMessageBox.critical(self, "Error", "Serial number already exists")
+                return
+
             cursor.execute("""
-                INSERT INTO users (name, serial_number, dob, password)
-                VALUES (%s, %s, %s, %s)
-            """, (name, serial, dob, str(uuid.uuid4())[:8]))
+                INSERT INTO users (name, serial_number, phone_number, address, password)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (name or None, serial, phone or None, address or None, str(uuid.uuid4())[:8]))
             self.controller.db.commit()
             cursor.close()
             QMessageBox.information(self, "Success", "User created successfully")
+            self.refresh()
+            dialog.accept()
+        except mysql.connector.Error as err:
+            QMessageBox.critical(self, "Error", f"Database error: {err}")
+
+    def update_user(self, old_serial, name, serial, phone, address, dialog):
+        try:
+            if not name or not serial:
+                QMessageBox.critical(self, "Error", "Name and serial number are required")
+                return
+
+            cursor = self.controller.db.cursor()
+            if serial != old_serial:
+                cursor.execute("SELECT id FROM users WHERE serial_number=%s", (serial,))
+                if cursor.fetchone():
+                    cursor.close()
+                    QMessageBox.critical(self, "Error", "Serial number already exists")
+                    return
+
+            cursor.execute("""
+                UPDATE users 
+                SET name=%s, serial_number=%s, phone_number=%s, address=%s
+                WHERE serial_number=%s
+            """, (name or None, serial, phone or None, address or None, old_serial))
+            self.controller.db.commit()
+            cursor.close()
+            QMessageBox.information(self, "Success", "User updated successfully")
             self.refresh()
             dialog.accept()
         except mysql.connector.Error as err:
@@ -613,6 +794,13 @@ class BookAuthorPage(QWidget):
         add_book_btn.clicked.connect(self.show_add_book_form)
         header_layout.addWidget(add_book_btn)
 
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.setObjectName("refreshButton")
+        refresh_btn.setFixedWidth(200)
+        refresh_btn.setMinimumHeight(50)
+        refresh_btn.clicked.connect(self.refresh)
+        header_layout.addWidget(refresh_btn)
+
         layout.addLayout(header_layout)
 
         # Search bar
@@ -624,10 +812,12 @@ class BookAuthorPage(QWidget):
 
         # Books table
         self.table = QTableWidget()
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(['Serial', 'Author', 'Book Title', 'Book Serial', 'Occupied By'])
+        self.table.setColumnCount(7)
+        self.table.setHorizontalHeaderLabels(['Serial', 'Author', 'Book Title', 'Book Serial', 'Occupied By', 'Location', 'Actions'])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setAlternatingRowColors(True)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.cellDoubleClicked.connect(self.show_update_book_form)
         layout.addWidget(self.table)
 
         # Pagination
@@ -638,7 +828,7 @@ class BookAuthorPage(QWidget):
         prev_btn.clicked.connect(self.prev_page)
         pagination_layout.addWidget(prev_btn)
 
-        self.page_label = QLabel("Page 1")
+        self.page_label = QLabel("Page 1 of 1")
         pagination_layout.addWidget(self.page_label)
 
         next_btn = QPushButton("Next")
@@ -651,6 +841,8 @@ class BookAuthorPage(QWidget):
         self.refresh()
 
     def refresh(self):
+        self.current_page = 1
+        self.search_input.clear()
         self.load_books()
 
     def load_books(self, search_term=""):
@@ -659,30 +851,52 @@ class BookAuthorPage(QWidget):
             cursor = self.controller.db.cursor()
             query = """
                 SELECT b.serial_number, a.name, b.title, b.serial_number, 
-                       COALESCE(u.name, 'Library') as occupied_by
+                       COALESCE(u.name, 'Library') as occupied_by,
+                       COALESCE(u.address, b.location) as location,
+                       b.id
                 FROM books b
                 JOIN authors a ON b.author_id = a.id
                 LEFT JOIN transactions t ON b.id = t.book_id AND t.return_date IS NULL
                 LEFT JOIN users u ON t.user_id = u.id
             """
-            params = ()
+            params = ""
             if search_term:
                 query += " WHERE b.title LIKE %s OR a.name LIKE %s"
                 params = (f"%{search_term}%", f"%{search_term}%")
 
             cursor.execute(query, params)
             books = cursor.fetchall()
-            cursor.close()
+
+            # Calculate total pages
+            total_books = len(books)
+            total_pages = max(1, (total_books + self.books_per_page - 1) // self.books_per_page)
 
             start = (self.current_page - 1) * self.books_per_page
             end = start + self.books_per_page
             self.table.setRowCount(min(self.books_per_page, len(books[start:end])))
 
             for row_idx, book in enumerate(books[start:end]):
-                for col_idx, value in enumerate(book):
-                    self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(value)))
+                for col_idx, value in enumerate(book[:-1]):  # Exclude book_id from display
+                    self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(value) if value else ''))
+                # Add Update button
+                update_btn = QPushButton("Update")
+                update_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #2196F3;
+                        color: white;
+                        border-radius: 5px;
+                        padding: 8px;
+                        font-size: 14pt;
+                    }
+                    QPushButton:hover {
+                        background-color: #1976D2;
+                    }
+                """)
+                update_btn.clicked.connect(lambda _, r=row_idx: self.show_update_book_form(r, 0))
+                self.table.setCellWidget(row_idx, 6, update_btn)
 
-            self.page_label.setText(f"Page {self.current_page}")
+            self.page_label.setText(f"Page {self.current_page} of {total_pages}")
+            cursor.close()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load books: {e}")
 
@@ -706,7 +920,8 @@ class BookAuthorPage(QWidget):
                 cursor.execute(query)
             total_books = cursor.fetchone()[0]
             cursor.close()
-            if self.current_page * self.books_per_page < total_books:
+            total_pages = max(1, (total_books + self.books_per_page - 1) // self.books_per_page)
+            if self.current_page < total_pages:
                 self.current_page += 1
                 self.load_books(self.search_input.text())
         except Exception as e:
@@ -729,6 +944,13 @@ class BookAuthorPage(QWidget):
         title.setStyleSheet("color: #1f2937; border: none;")
         frame_layout.addWidget(title)
 
+        # Search bar
+        self.author_search_input = QLineEdit()
+        self.author_search_input.setPlaceholderText("Search authors...")
+        self.author_search_input.setMinimumHeight(50)
+        self.author_search_input.textChanged.connect(lambda: self.load_authors(dialog))
+        frame_layout.addWidget(self.author_search_input)
+
         # Authors table
         self.authors_table = QTableWidget()
         self.authors_table.setColumnCount(2)
@@ -741,7 +963,6 @@ class BookAuthorPage(QWidget):
         pagination_frame = QFrame()
         pagination_layout = QHBoxLayout(pagination_frame)
 
-        # Green Button Style
         green_button_style = """
             QPushButton {
                 background-color: #4CAF50;
@@ -755,26 +976,21 @@ class BookAuthorPage(QWidget):
             }
         """
 
-        # Previous Button
         prev_btn = QPushButton("Previous")
         prev_btn.setMinimumHeight(50)
         prev_btn.setStyleSheet(green_button_style)
         prev_btn.clicked.connect(lambda: self.prev_author_page(dialog))
         pagination_layout.addWidget(prev_btn)
 
-        # Spacer before label
         pagination_layout.addStretch(1)
 
-        # Center Page Label
-        self.author_page_label = QLabel("Page 1")
+        self.author_page_label = QLabel("Page 1 of 1")
         self.author_page_label.setStyleSheet("font: 12pt 'Helvetica'; color: #2c3e50;")
         self.author_page_label.setAlignment(Qt.AlignCenter)
         pagination_layout.addWidget(self.author_page_label)
 
-        # Spacer after label
         pagination_layout.addStretch(1)
 
-        # Next Button
         next_btn = QPushButton("Next")
         next_btn.setMinimumHeight(50)
         next_btn.setStyleSheet(green_button_style)
@@ -793,19 +1009,30 @@ class BookAuthorPage(QWidget):
         try:
             self.authors_table.setRowCount(0)
             cursor = self.controller.db.cursor()
-            cursor.execute("SELECT name, details FROM authors")
+            query = "SELECT name, details FROM authors"
+            params = ""
+            search_term = self.author_search_input.text().strip()
+            if search_term:
+                query += " WHERE name LIKE %s"
+                params = (f"%{search_term}%",)
+
+            cursor.execute(query, params)
             authors = cursor.fetchall()
-            cursor.close()
+
+            # Calculate total pages
+            total_authors = len(authors)
+            total_pages = max(1, (total_authors + self.authors_per_page - 1) // self.authors_per_page)
 
             start = (self.current_author_page - 1) * self.authors_per_page
             end = start + self.authors_per_page
             self.authors_table.setRowCount(min(self.authors_per_page, len(authors[start:end])))
 
             for row_idx, author in enumerate(authors[start:end]):
-                self.authors_table.setItem(row_idx, 0, QTableWidgetItem(author[0]))
+                self.authors_table.setItem(row_idx, 0, QTableWidgetItem(author[0] if author[0] else ''))
                 self.authors_table.setItem(row_idx, 1, QTableWidgetItem(author[1] if author[1] else ''))
 
-            self.author_page_label.setText(f"Page {self.current_author_page}")
+            self.author_page_label.setText(f"Page {self.current_author_page} of {total_pages}")
+            cursor.close()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load authors: {e}")
 
@@ -817,10 +1044,16 @@ class BookAuthorPage(QWidget):
     def next_author_page(self, dialog):
         try:
             cursor = self.controller.db.cursor()
-            cursor.execute("SELECT COUNT(*) FROM authors")
+            query = "SELECT COUNT(*) FROM authors"
+            if self.author_search_input.text():
+                query += " WHERE name LIKE %s"
+                cursor.execute(query, (f"%{self.author_search_input.text()}%",))
+            else:
+                cursor.execute(query)
             total_authors = cursor.fetchone()[0]
             cursor.close()
-            if self.current_author_page * self.authors_per_page < total_authors:
+            total_pages = max(1, (total_authors + self.authors_per_page - 1) // self.authors_per_page)
+            if self.current_author_page < total_pages:
                 self.current_author_page += 1
                 self.load_authors(dialog)
         except Exception as e:
@@ -857,7 +1090,7 @@ class BookAuthorPage(QWidget):
         add_author_btn.setMinimumHeight(50)
         add_author_btn.setStyleSheet("""
             QPushButton {
-                background-color: #4CAF50;  
+                background-color: #4CAF50;
                 color: white;
                 font: 14pt "Helvetica";
                 border-radius: 5px;
@@ -875,7 +1108,7 @@ class BookAuthorPage(QWidget):
     def show_add_book_form(self):
         dialog = QDialog(self.controller)
         dialog.setWindowTitle("Add Book")
-        dialog.setFixedSize(500, 500)
+        dialog.setFixedSize(500, 600)
         dialog.setStyleSheet("background-color: #f0f2f5;")
 
         layout = QVBoxLayout(dialog)
@@ -907,41 +1140,130 @@ class BookAuthorPage(QWidget):
         self.refresh_authors()
         frame_layout.addWidget(self.author_dropdown)
 
-        # Book Title Input
         self.book_title = QLineEdit()
         self.book_title.setPlaceholderText("Book Title")
         self.book_title.setMinimumHeight(50)
         frame_layout.addWidget(self.book_title)
 
-        # Book Serial Input
         self.book_serial = QLineEdit()
         self.book_serial.setPlaceholderText("Book Serial")
         self.book_serial.setMinimumHeight(50)
         frame_layout.addWidget(self.book_serial)
 
-        # Green Button Style
-        green_button_style = """
+        self.book_location = QLineEdit()
+        self.book_location.setPlaceholderText("Book Location")
+        self.book_location.setMinimumHeight(50)
+        frame_layout.addWidget(self.book_location)
+
+        add_book_btn = QPushButton("Add Book")
+        add_book_btn.setMinimumHeight(50)
+        add_book_btn.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
                 color: white;
-                font: 12pt "Helvetica";
+                font: 14pt "Helvetica";
                 border-radius: 5px;
-                padding: 10px;
             }
             QPushButton:hover {
                 background-color: #45a049;
             }
-        """
-
-        # Add Book Button
-        add_book_btn = QPushButton("Add Book")
-        add_book_btn.setMinimumHeight(50)
-        add_book_btn.setStyleSheet(green_button_style)
+        """)
         add_book_btn.clicked.connect(lambda: self.add_book(dialog))
         frame_layout.addWidget(add_book_btn)
 
         layout.addWidget(frame)
         dialog.exec_()
+
+    def show_update_book_form(self, row, col):
+        try:
+            serial_number = self.table.item(row, 3).text() if self.table.item(row, 3) else ""
+            if not serial_number:
+                QMessageBox.critical(self, "Error", "No serial number found for this book")
+                return
+
+            cursor = self.controller.db.cursor()
+            cursor.execute("""
+                SELECT b.title, b.serial_number, b.location, a.name, COALESCE(u.name, 'Library') as occupied_by
+                FROM books b
+                JOIN authors a ON b.author_id = a.id
+                LEFT JOIN transactions t ON b.id = t.book_id AND t.return_date IS NULL
+                LEFT JOIN users u ON t.user_id = u.id
+                WHERE b.serial_number=%s
+            """, (serial_number,))
+            book = cursor.fetchone()
+            cursor.close()
+
+            if not book:
+                QMessageBox.critical(self, "Error", "Book not found")
+                return
+
+            dialog = QDialog(self.controller)
+            dialog.setWindowTitle("Update Book")
+            dialog.setFixedSize(500, 600)
+            dialog.setStyleSheet("background-color: #f0f2f5;")
+
+            layout = QVBoxLayout(dialog)
+            frame = QFrame()
+            frame_layout = QVBoxLayout(frame)
+            frame_layout.setSpacing(20)
+            frame_layout.setContentsMargins(30, 30, 30, 30)
+
+            title = QLabel("Update Book")
+            title.setFont(QFont("Helvetica, Arial, sans-serif", 24, QFont.Bold))
+            title.setStyleSheet("color: #1f2937; border: none;")
+            frame_layout.addWidget(title)
+
+            # Author (non-editable)
+            author_label = QLabel(f"Author: {book[3]}")
+            author_label.setStyleSheet("color: #1f2937; font-size: 14pt; border: none;")
+            frame_layout.addWidget(author_label)
+
+            # Book Title
+            book_title = QLineEdit(book[0] or "")
+            book_title.setPlaceholderText("Book Title")
+            book_title.setMinimumHeight(50)
+            frame_layout.addWidget(book_title)
+
+            # Book Serial
+            book_serial = QLineEdit(book[1] or "")
+            book_serial.setPlaceholderText("Book Serial")
+            book_serial.setMinimumHeight(50)
+            frame_layout.addWidget(book_serial)
+
+            # Book Location
+            book_location = QLineEdit(book[2] or "")
+            book_location.setPlaceholderText("Book Location")
+            book_location.setMinimumHeight(50)
+            if book[4] != "Library":
+                book_location.setEnabled(False)
+                book_location.setToolTip("Location cannot be edited while book is issued")
+            frame_layout.addWidget(book_location)
+
+            # Occupied By (non-editable)
+            occupied_by_label = QLabel(f"Occupied By: {book[4]}")
+            occupied_by_label.setStyleSheet("color: #1f2937; font-size: 14pt; border: none;")
+            frame_layout.addWidget(occupied_by_label)
+
+            update_btn = QPushButton("Update Book")
+            update_btn.setMinimumHeight(50)
+            update_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #2196F3;
+                    color: white;
+                    font: 14pt "Helvetica";
+                    border-radius: 5px;
+                }
+                QPushButton:hover {
+                    background-color: #1976D2;
+                }
+            """)
+            update_btn.clicked.connect(lambda: self.update_book(book[1], book_title.text(), book_serial.text(), book_location.text(), book[4], dialog))
+            frame_layout.addWidget(update_btn)
+
+            layout.addWidget(frame)
+            dialog.exec_()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load book data: {e}")
 
     def refresh_authors(self):
         try:
@@ -964,7 +1286,7 @@ class BookAuthorPage(QWidget):
                 return
 
             cursor = self.controller.db.cursor()
-            cursor.execute("INSERT INTO authors (name, details) VALUES (%s, %s)", (name, details))
+            cursor.execute("INSERT INTO authors (name, details) VALUES (%s, %s)", (name or None, details or None))
             self.controller.db.commit()
             cursor.close()
             QMessageBox.information(self, "Success", "Author added successfully")
@@ -981,9 +1303,10 @@ class BookAuthorPage(QWidget):
             author_name = self.author_dropdown.currentText()
             title = self.book_title.text().strip()
             serial = self.book_serial.text().strip()
+            location = self.book_location.text().strip()
 
             if not all([author_name, title, serial]):
-                QMessageBox.critical(self, "Error", "All fields are required")
+                QMessageBox.critical(self, "Error", "Author, title, and serial are required")
                 return
 
             cursor = self.controller.db.cursor()
@@ -995,18 +1318,56 @@ class BookAuthorPage(QWidget):
                 return
             author_id = result[0]
 
+            cursor.execute("SELECT id FROM books WHERE serial_number=%s", (serial,))
+            if cursor.fetchone():
+                cursor.close()
+                QMessageBox.critical(self, "Error", "Book serial number already exists")
+                return
+
             cursor.execute("""
-                INSERT INTO books (serial_number, title, author_id)
-                VALUES (%s, %s, %s)
-            """, (serial, title, author_id))
+                INSERT INTO books (serial_number, title, author_id, location)
+                VALUES (%s, %s, %s, %s)
+            """, (serial, title, author_id, location or None))
             self.controller.db.commit()
             cursor.close()
             QMessageBox.information(self, "Success", "Book added successfully")
             self.book_title.clear()
             self.book_serial.clear()
+            self.book_location.clear()
             self.author_dropdown.setCurrentIndex(-1)
             dialog.accept()
             self.refresh()
+        except mysql.connector.Error as err:
+            QMessageBox.critical(self, "Error", f"Database error: {err}")
+
+    def update_book(self, old_serial, title, serial, location, occupied_by, dialog):
+        try:
+            if not title or not serial:
+                QMessageBox.critical(self, "Error", "Title and serial number are required")
+                return
+
+            if occupied_by != "Library" and location != self.table.item(self.table.currentRow(), 5).text():
+                QMessageBox.critical(self, "Error", "Location can only be updated when book is in Library")
+                return
+
+            cursor = self.controller.db.cursor()
+            if serial != old_serial:
+                cursor.execute("SELECT id FROM books WHERE serial_number=%s", (serial,))
+                if cursor.fetchone():
+                    cursor.close()
+                    QMessageBox.critical(self, "Error", "Book serial number already exists")
+                    return
+
+            cursor.execute("""
+                UPDATE books 
+                SET title=%s, serial_number=%s, location=%s
+                WHERE serial_number=%s
+            """, (title, serial, location or None, old_serial))
+            self.controller.db.commit()
+            cursor.close()
+            QMessageBox.information(self, "Success", "Book updated successfully")
+            self.refresh()
+            dialog.accept()
         except mysql.connector.Error as err:
             QMessageBox.critical(self, "Error", f"Database error: {err}")
 
@@ -1019,10 +1380,21 @@ class AssignReturnPage(QWidget):
         layout.setSpacing(30)
 
         # Header
+        header_layout = QHBoxLayout()
         title = QLabel("Book Transactions")
         title.setFont(QFont("Helvetica, Arial, sans-serif", 32, QFont.Bold))
         title.setStyleSheet("color: #1f2937; border: none;")
-        layout.addWidget(title)
+        header_layout.addWidget(title)
+        header_layout.addStretch()
+
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.setObjectName("refreshButton")
+        refresh_btn.setFixedWidth(180)
+        refresh_btn.setMinimumHeight(50)
+        refresh_btn.clicked.connect(self.refresh)
+        header_layout.addWidget(refresh_btn)
+
+        layout.addLayout(header_layout)
 
         # Split layout
         split_layout = QHBoxLayout()
@@ -1049,7 +1421,7 @@ class AssignReturnPage(QWidget):
                 font: bold 14pt "Helvetica";
                 color: #000000;
                 background-color: #f0f0f0;
-                selection-background-color: #a5d6a7;  /* Soft green instead of white */
+                selection-background-color: #a5d6a7;
                 selection-color: #000000;
             }
         """
@@ -1136,16 +1508,16 @@ class AssignReturnPage(QWidget):
             # Load users
             cursor.execute("SELECT name FROM users")
             users = [row[0] for row in cursor.fetchall()]
-            # Load books
-            cursor.execute("SELECT title FROM books")
+            # Load available books (not currently issued)
+            cursor.execute("""
+                SELECT b.title 
+                FROM books b
+                LEFT JOIN transactions t ON b.id = t.book_id AND t.return_date IS NULL
+                WHERE t.id IS NULL
+            """)
             books = [row[0] for row in cursor.fetchall()]
             cursor.close()
 
-            # Debug: Verify data
-            print(f"Users loaded: {users}")
-            print(f"Books loaded: {books}")
-
-            # Populate dropdowns
             self.user_dropdown.clear()
             self.return_user_dropdown.clear()
             self.book_dropdown.clear()
@@ -1160,16 +1532,14 @@ class AssignReturnPage(QWidget):
             if books:
                 self.book_dropdown.addItems(books)
             else:
-                self.book_dropdown.addItem("No books found")
-                QMessageBox.warning(self, "Warning", "No books found in the database.")
+                self.book_dropdown.addItem("No books available")
+                QMessageBox.warning(self, "Warning", "No available books found in the database.")
         except Exception as e:
-            print(f"Dropdown population error: {e}")
             QMessageBox.critical(self, "Error", f"Failed to populate dropdowns: {e}")
 
     def update_return_books(self):
         try:
             user_name = self.return_user_dropdown.currentText().strip()
-            print(f"Updating return books for user: {user_name}")
             self.return_book_dropdown.clear()
 
             if not user_name or user_name == "No users found":
@@ -1187,16 +1557,12 @@ class AssignReturnPage(QWidget):
             books = [row[0] for row in cursor.fetchall()]
             cursor.close()
 
-            # Debug: Verify books for return
-            print(f"Books for user '{user_name}': {books}")
-
             if books:
                 self.return_book_dropdown.addItems(books)
             else:
                 self.return_book_dropdown.addItem("No issued books")
                 QMessageBox.warning(self, "Warning", f"No issued books found for user '{user_name}'.")
         except Exception as e:
-            print(f"Update return books error: {e}")
             QMessageBox.critical(self, "Error", f"Failed to refresh return books: {e}")
 
     def assign_book(self):
@@ -1205,7 +1571,7 @@ class AssignReturnPage(QWidget):
             book_title = self.book_dropdown.currentText().strip()
             issue_date = self.issue_date.date().toPyDate()
 
-            if not user_name or not book_title or user_name == "No users found" or book_title == "No books found":
+            if not user_name or not book_title or user_name == "No users found" or book_title == "No books available":
                 QMessageBox.critical(self, "Error", "Please select both a valid user and book")
                 return
 
@@ -1293,10 +1659,21 @@ class AdminPanelPage(QWidget):
         layout.setSpacing(30)
 
         # Header
+        header_layout = QHBoxLayout()
         title = QLabel("Admin Panel")
         title.setFont(QFont("Helvetica, Arial, sans-serif", 32, QFont.Bold))
         title.setStyleSheet("color: #1f2937; border: none;")
-        layout.addWidget(title)
+        header_layout.addWidget(title)
+        header_layout.addStretch()
+
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.setObjectName("refreshButton")
+        refresh_btn.setFixedWidth(180)
+        refresh_btn.setMinimumHeight(50)
+        refresh_btn.clicked.connect(self.refresh)
+        header_layout.addWidget(refresh_btn)
+
+        layout.addLayout(header_layout)
 
         # Form
         frame = QFrame()
@@ -1305,19 +1682,19 @@ class AdminPanelPage(QWidget):
         frame_layout.setContentsMargins(30, 30, 30, 30)
 
         combo_style = """
-                    QComboBox {
-                        color: #000000;
-                        font: bold 14pt "Helvetica";
-                        padding: 6px;
-                    }
-                    QComboBox QAbstractItemView {
-                        font: bold 14pt "Helvetica";
-                        color: #000000;
-                        background-color: #f0f0f0;
-                        selection-background-color: #a5d6a7;  /* Soft green instead of white */
-                        selection-color: #000000;
-                    }
-                """
+            QComboBox {
+                color: #000000;
+                font: bold 14pt "Helvetica";
+                padding: 6px;
+            }
+            QComboBox QAbstractItemView {
+                font: bold 14pt "Helvetica";
+                color: #000000;
+                background-color: #f0f0f0;
+                selection-background-color: #a5d6a7;
+                selection-color: #000000;
+            }
+        """
         self.user_dropdown = QComboBox()
         self.user_dropdown.setMinimumHeight(50)
         self.user_dropdown.setStyleSheet(combo_style)
@@ -1344,7 +1721,7 @@ class AdminPanelPage(QWidget):
         layout.addWidget(frame)
         layout.addStretch()
 
-        self.refresh_users()
+        self.refresh()
 
     def refresh(self):
         self.refresh_users()
@@ -1419,6 +1796,13 @@ class ReportPage(QWidget):
         export_btn.clicked.connect(self.export_to_excel)
         header_layout.addWidget(export_btn)
 
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.setObjectName("refreshButton")
+        refresh_btn.setFixedWidth(180)
+        refresh_btn.setMinimumHeight(50)
+        refresh_btn.clicked.connect(self.refresh)
+        header_layout.addWidget(refresh_btn)
+
         layout.addLayout(header_layout)
 
         # Report options
@@ -1462,7 +1846,8 @@ class ReportPage(QWidget):
             if report_type == "all_books":
                 query = """
                     SELECT b.serial_number, b.title, a.name as author, 
-                           u.name as user, t.issue_date, t.return_date
+                           u.name as user, COALESCE(u.address, b.location) as location,
+                           t.issue_date, t.return_date
                     FROM books b
                     LEFT JOIN authors a ON b.author_id = a.id
                     LEFT JOIN transactions t ON b.id = t.book_id
@@ -1472,7 +1857,7 @@ class ReportPage(QWidget):
             elif report_type == "issued_books":
                 query = """
                     SELECT b.serial_number, b.title, a.name as author, 
-                           u.name as user, t.issue_date
+                           u.name as user, u.address as location, t.issue_date
                     FROM books b
                     JOIN authors a ON b.author_id = a.id
                     JOIN transactions t ON b.id = t.book_id
@@ -1483,7 +1868,8 @@ class ReportPage(QWidget):
             else:
                 query = """
                     SELECT b.serial_number, b.title, a.name as author, 
-                           u.name as user, t.issue_date, t.return_date
+                           u.name as user, COALESCE(u.address, b.location) as location,
+                           t.issue_date, t.return_date
                     FROM books b
                     JOIN authors a ON b.author_id = a.id
                     JOIN transactions t ON b.id = t.book_id
